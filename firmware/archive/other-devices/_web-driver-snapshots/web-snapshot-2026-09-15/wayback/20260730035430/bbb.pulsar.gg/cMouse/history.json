@@ -1,0 +1,49 @@
+{
+  "Firmware": [
+    {
+      "version": "BETA Firmware Distribution",
+      "UpdateDate": "2026-02-05",
+      "Features": [
+	  "Mouse v4.07 / Dongle v4.00",
+	  "- Supported Products -",
+        "CrazyLight Series , ※ The LED 8K Dongle is not supported(ex: Pokémon Edition, BlueArchive Edition)",
+        "TenZ Series",
+		"JV-X",
+		"Susanto-X",
+        "Pulsar Lab. X2F Series (commercially sold version)",
+		"Download it from our website. → <a href='https://www.pulsar.gg/pages/download' target='_blank'>Download Page</a>",
+		" - Notes -",
+		"Please update the dongle first, followed by the mouse. (The update must be performed using a USB cable.)",
+		"If the update fails, press the 'Enter' key on your keyboard to try again."
+      ],
+      "Fixes": ["Improved DPI stability", "Improved wireless stability", "Dongle LED auto-off time changed from 10 seconds to 1 minute", "Dongle name changed from 8K Dongle to 8K Dongle Gen.2"]
+    }
+  ],
+  "Driver": [
+  
+    {
+		    "version": "V1.3.10",
+      "UpdateDate": "2026-06-24",
+      "Features": [
+        "Added Sleep Mode and Long-Distance Mode"
+      ],
+      "Fixes": ["Updated Performance tab UI", "Miscellaneous bug fixes"]
+    },
+	{
+		    "version": "V1.3.6",
+      "UpdateDate": "2026-03-11",
+      "Features": [
+        "LED 8K Dongle Firmware v2.08 support"
+      ],
+      "Fixes": ["Language: Korean", "The polling rate change feature in the Customize tab was incorrectly displayed."]
+	},
+    {
+      "version": "V1.3.5",
+      "UpdateDate": "2026-02-05",
+      "Features": [
+        "Language translation"
+      ],
+      "Fixes": ["Bugs etc."]
+	}
+  ]
+}

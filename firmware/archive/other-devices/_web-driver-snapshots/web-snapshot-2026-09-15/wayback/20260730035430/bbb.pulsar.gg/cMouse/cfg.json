@@ -1,0 +1,3421 @@
+{
+  "title": "Bibimbap",
+  "web": "https://bbb.pulsar.gg/",
+  "version": "1.3.11",
+  "vid": ["0x3710", "0x3554"],
+  "pid": {
+    "mouse": {
+      "wireless": ["0x5406", "0x5502", "0x5501", "0x5504", "0x5407", "0xF517", "0x5601"],
+      "wired": ["0x3414", "0x3415", "0x7501", "0x7502", "0x7503", "0x7504", "0x7505", "0x7506", "0x3506", "0x3507", "0x3508", "0x3509", "0x3510", "0x3512", "0x3513", "0x3514", "0x3515", "0x3516", "0x3517", "0x3518", "0x3519", "0x3524", "0x3525", "0x3526", "0x3527", "0x3528", "0x3529", "0x3601", "0x3603", "0x9502", "0x9503", "0x9601", "0x7508", "0x7509", "0x7510", "0x7507", "0x7601", "0x7602", "0x7603", "0x7604"]
+    },
+    "keyboard": {
+      "wireless": ["0xF809"],
+      "wired": ["0xF50A"]
+    }
+  },
+  "home": {
+    "theme": "rgb(62,134,244)",
+    "font": "rgb(0,0,0)"
+  },
+  "General": {
+    "theme": "#0080FF",
+    "font": "#474C51",
+    "font-tips": "#474C51",
+    "hover-font": "#474C51",
+    "warning": "#F7444E",
+    "info": "#f1f1f1",
+    "back": "#FFFFFF",
+    "block": "#ffffff",
+    "inactive": "#999ba2",
+    "button": "#f1f1f1",
+    "button-hover": "#D9E2EC",
+    "button-check-font": "#ffffff",
+    "border": "rgb(180,180,180)",
+    "border-color": "#E4E7ED",
+    "icon": "#D9D9D9",
+    "intro": "#FFFFFF",
+    "intro-inner": "#F1F1F1",
+    "intro-firmware": "#D9E2EC",
+    "intro-new-firmware": "#F7444E",
+    "intro-firmware-inner": "#ffffff",
+    "key": "#d6d7da",
+    "key-hover": "#c1c3c7",
+    "subkey-back": "#D9E2EC",
+    "subkey": "#ffffff",
+    "subkey-hover": "#D9D9D9",
+    "sensor": "#f1f1f1",
+    "dongle-back": "#989ba2",
+    "power-title": "#f1f1f1",
+    "power-select": "#ffffff",
+    "power-static": "#ADAFB5",
+    "setting-firmware": "#D9E2EC",
+    "setting-dongle": "#474C51",
+    "setting-pairtool": "#D9E2EC",
+    "setting-help": "#474C51"
+  },
+  "DarkTheme": {
+    "theme": "#0080FF",
+    "font": "#ffffff",
+    "font-tips": "#fff",
+    "hover-font": "#fff",
+    "warning": "#F7444E",
+    "info": "#000000",
+    "back": "#000000",
+    "block": "#232323",
+    "inactive": "#3d3e41",
+    "button": "#000000",
+    "button-hover": "#3d3e41",
+    "border": "rgb(180,180,180)",
+    "icon": "#D9D9D9",
+    "intro": "#000000",
+    "intro-inner": "#232323",
+    "intro-firmware": "#232323",
+    "intro-new-firmware": "#F7444E",
+    "intro-firmware-inner": "#000000",
+    "key": "#232323",
+    "key-hover": "#3d3e41",
+    "subkey-back": "#000000",
+    "subkey": "#232323",
+    "subkey-hover": "#3d3e41",
+    "sensor": "#000000",
+    "dongle-back": "#232323",
+    "power-title": "#3D3E41",
+    "power-select": "#363636",
+    "power-static": "#2B2C2F",
+    "setting-firmware": "#232323",
+    "setting-dongle": "#474C51",
+    "setting-pairtool": "#232323",
+    "setting-help": "#232323"
+  },
+  "Feinmann": {
+    "theme": "#026045",
+    "font": "#ffffff",
+    "font-tips": "#fff",
+    "hover-font": "#fff",
+    "warning": "#F7444E",
+    "info": "#000000",
+    "back": "#000000",
+    "block": "#232323",
+    "inactive": "#3d3e41",
+    "button": "#000000",
+    "button-hover": "#3d3e41",
+    "border": "rgb(180,180,180)",
+    "icon": "#D9D9D9",
+    "intro": "#000000",
+    "intro-inner": "#232323",
+    "intro-firmware": "#232323",
+    "intro-new-firmware": "#F7444E",
+    "intro-firmware-inner": "#000000",
+    "key": "#232323",
+    "key-hover": "#3d3e41",
+    "subkey-back": "#000000",
+    "subkey": "#232323",
+    "subkey-hover": "#3d3e41",
+    "sensor": "#000000",
+    "dongle-back": "#232323",
+    "power-title": "#3D3E41",
+    "power-select": "#363636",
+    "power-static": "#2B2C2F",
+    "setting-firmware": "#232323",
+    "setting-dongle": "#474C51",
+    "setting-pairtool": "#232323",
+    "setting-help": "#232323"
+  },
+  "TenZ": {
+    "theme": "#CC001A",
+    "font": "#ffffff",
+    "font-tips": "#fff",
+    "hover-font": "#ffffff",
+    "warning": "#F7444E",
+    "info": "#000000",
+    "back": "#000000",
+    "block": "#232323",
+    "inactive": "#3d3e41",
+    "button": "#000000",
+    "button-hover": "#3d3e41",
+    "button-check-font": "#ffffff",
+    "border": "rgb(180,180,180)",
+    "icon": "#D9D9D9",
+    "intro": "#000000",
+    "intro-inner": "#232323",
+    "intro-firmware": "#232323",
+    "intro-new-firmware": "#F7444E",
+    "intro-firmware-inner": "#000000",
+    "key": "#232323",
+    "key-hover": "#3d3e41",
+    "subkey-back": "#000000",
+    "subkey": "#232323",
+    "subkey-hover": "#3d3e41",
+    "sensor": "#000000",
+    "dongle-back": "#232323",
+    "power-title": "#3D3E41",
+    "power-select": "#363636",
+    "power-static": "#2B2C2F",
+    "setting-firmware": "#232323",
+    "setting-dongle": "#474C51",
+    "setting-pairtool": "#232323",
+    "setting-help": "#232323"
+  },
+  "ZywOo": {
+    "theme": "#FF1366",
+    "font": "#ffffff",
+    "font-tips": "#fff",
+    "hover-font": "#fff",
+    "warning": "#F7444E",
+    "info": "#000000",
+    "back": "#000000",
+    "block": "#232323",
+    "inactive": "#3d3e41",
+    "button": "#000000",
+    "button-hover": "#3d3e41",
+    "border": "rgb(180,180,180)",
+    "icon": "#D9D9D9",
+    "intro": "#000000",
+    "intro-inner": "#232323",
+    "intro-firmware": "#232323",
+    "intro-new-firmware": "#F7444E",
+    "intro-firmware-inner": "#000000",
+    "key": "#232323",
+    "key-hover": "#3d3e41",
+    "subkey-back": "#000000",
+    "subkey": "#232323",
+    "subkey-hover": "#3d3e41",
+    "sensor": "#000000",
+    "dongle-back": "#232323",
+    "power-title": "#3D3E41",
+    "power-select": "#363636",
+    "power-static": "#2B2C2F",
+    "setting-firmware": "#232323",
+    "setting-dongle": "#474C51",
+    "setting-pairtool": "#232323",
+    "setting-help": "#232323"
+  },
+  "VSPO": {
+    "theme": "#5F52C8",
+    "font": "#fff",
+    "font-tips": "#989BA2",
+    "hover-font": "#fff",
+    "warning": "#FF5190",
+    "info": "#000",
+    "back": "#fff",
+    "block": "#232323",
+    "inactive": "#3d3e41",
+    "button": "#111212",
+    "button-hover": "#3d3e41",
+    "border": "rgb(180,180,180)",
+    "icon": "#D9D9D9",
+    "intro": "#000000",
+    "intro-inner": "#232323",
+    "intro-firmware": "#232323",
+    "intro-new-firmware": "#F7444E",
+    "intro-firmware-inner": "#000000",
+    "key": "#222325",
+    "key-hover": "#3d3e41",
+    "subkey-back": "#000000",
+    "subkey": "#232323",
+    "subkey-hover": "#ffffff",
+    "sensor": "#000000",
+    "dongle-back": "#232323",
+    "power-title": "#3D3E41",
+    "power-select": "#363636",
+    "power-static": "#2B2C2F",
+    "setting-firmware": "#232323",
+    "setting-dongle": "#474C51",
+    "setting-pairtool": "#232323",
+    "setting-help": "#232323"
+  },
+  "FS": {
+    "theme": "#f5333f",
+    "font": "#fff",
+    "font-tips": "#989BA2",
+    "hover-font": "#fff",
+    "warning": "#f5333f",
+    "info": "#000",
+    "back": "#fff",
+    "block": "#1E2936",
+    "inactive": "#3d3e41",
+    "button": "#011B2B",
+    "button-hover": "#394350",
+    "border": "#394350",
+    "icon": "#D9D9D9",
+    "intro": "#1E2936",
+    "intro-inner": "#394350",
+    "intro-firmware": "#394350",
+    "intro-new-firmware": "#F7444E",
+    "intro-firmware-inner": "#1E2936",
+    "key": "#1e2936",
+    "key-hover": "#394350",
+    "subkey-back": "#000000",
+    "subkey": "#1E2936",
+    "subkey-hover": "#ffffff",
+    "sensor": "#011b2b",
+    "dongle-back": "#1E2936",
+    "power-title": "#394350",
+    "power-select": "#363636",
+    "power-static": "#28323D",
+    "setting-firmware": "#1E2936",
+    "setting-dongle": "#474C51",
+    "setting-pairtool": "#1E2936",
+    "setting-help": "#1E2936"
+  },
+  "showBatteryValue": true,
+  "language": ["ko", "en", "zh-CN", "ja", "de", "es-ES", "ru", "en-PH", "fr", "tr", "sv", "ar", "pl"],
+  "debug": {
+    "log": true,
+    "batteryPolling": true
+  },
+  "demo": false,
+  "mouse": [
+    {
+      "cid": 87,
+      "cfg": [
+        {
+          "mid": [1, 2, 3, 4, 5, 6, 9, 10, 12, 13, 14, 15, 16, 41, 42, 43, 44, 85, 95, 96],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v3.05",
+              "link": "/Mouse-DM161-3710-3414-63CC886F-V3.05.bin"
+            }
+          }
+        },
+        {
+          "mid": [17, 18, 116],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v3.03",
+              "link": "/Mouse-DM175-3710-3506-D60C3DFA-V3.03.bin"
+            }
+          }
+        },
+        {
+          "mid": [19, 20],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v3.04",
+              "link": "/Mouse-DM176-3710-3507-04A90E51-V3.04.bin"
+            }
+          }
+        },
+        {
+          "mid": [21, 22],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v3.04",
+              "link": "/Mouse-DM177-3710-3508-A8094761-V3.04.bin"
+            }
+          }
+        },
+        {
+          "mid": [23, 24, 117, 118, 119],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v3.04",
+              "link": "/Mouse-DM178-3710-3509-F44C45CF-V3.04.bin"
+            }
+          }
+        },
+        {
+          "mid": [25, 26],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v3.03",
+              "link": "/Mouse-DM179-3770-3510-257127B4-V3.03.bin"
+            }
+          }
+        },
+        {
+          "mid": [28, 30, 31, 32, 33, 35],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v3.03",
+              "link": "/Mouse-DM175-3710-3506-D60C3DFA-V3.03.bin"
+            }
+          }
+        },
+        {
+          "mid": [29, 76],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v3.04",
+              "link": "/Mouse-DM188-3710-3528-V3.04.bin"
+            }
+          }
+        },
+        {
+          "mid": [34, 71],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v3.05",
+              "link": "/Mouse-DM185-3395-3710-3525-643A674C-V3.05.bin"
+            }
+          }
+        },
+        {
+          "mid": [7, 8, 37, 40],
+          "theme": "TenZ",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v3.03",
+              "link": "/Mouse-DM169-3770-3415-2E82C72F-V3.03.bin"
+            }
+          }
+        },
+        {
+          "mid": [38],
+          "theme": "DarkTheme",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v3.03",
+              "link": "/Mouse-IM31-3710-7501-AF27F237-V3.03.bin"
+            }
+          }
+        },
+        {
+          "mid": [11, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66],
+          "theme": "VSPO",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v3.04",
+              "link": "/Mouse-IM33-3710-7504-V3.04-9B684E62.bin"
+            }
+          }
+        },
+        {
+          "mid": [39],
+          "theme": "DarkTheme",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v3.04",
+              "link": "/Mouse-IM41-3395-3710-7503-22A4F371-V3.04.bin"
+            }
+          }
+        },
+        {
+          "mid": [36],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 170],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [246, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [304, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(255,0,0)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 1200,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(255,0,255)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 5000,
+              "color": "rgb(255,255,255)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v3.03",
+              "link": "/8K-Mouse-X2F-V3.03-2C2516F4.bin"
+            }
+          }
+        },
+        {
+          "mid": [67],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 170],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [246, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [304, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(255,0,0)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 1200,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(255,0,255)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 5000,
+              "color": "rgb(255,255,255)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v3.03",
+              "link": "/8K-Mouse-X2F-5th-V3.03-4064453F.bin"
+            }
+          }
+        },
+        {
+          "mid": [68, 69, 100],
+          "theme": "ZywOo",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "3950",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade_no": {
+            "device": {
+              "version": "v3.04",
+              "link": "/Mouse-zywoo-3710-7506-V3.04-72A74C64.bin"
+            }
+          }
+        },
+        {
+          "mid": [27, 70, 79, 80, 81, 83, 84, 86, 109],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v3.04",
+              "link": "/Mouse-DM181-3710-3524-V3.04-2E70FD8D.bin"
+            }
+          }
+        },
+        {
+          "mid": [72, 73, 77, 78, 82, 86, 87, 88, 89, 90, 102, 103, 105, 106],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false
+        },
+        {
+          "mid": [74, 75, 104],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false
+        },
+        {
+          "mid": [101],
+          "theme": "Feinmann",
+          "middleDpi": 3200,
+          "maxDpi": 42000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "3955",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v5.09",
+              "link": "/Mouse-fs01-V5.09-55A3EE22.bin"
+            }
+          }
+        },
+        {
+          "mid": [107, 110],
+          "theme": "TenZ",
+          "middleDpi": 3200,
+          "maxDpi": 42000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "3955",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false
+        },
+        {
+          "mid": [122, 123],
+          "theme": "TenZ",
+          "middleDpi": 3200,
+          "maxDpi": 42000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "3955",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false
+        },
+        {
+          "mid": [108, 113, 115, 126],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 42000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+           "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "3955",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false
+        },
+        {
+          "mid": [111],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 42000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [158, 0],
+              "line": [150, 15, 210, 15],
+              "index": 6,
+              "value": ["A", "400"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "3955",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false
+        },
+        {
+          "mid": [92, 94],
+          "theme": "DarkTheme",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "3950",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false
+        },
+        {
+          "mid": [91, 127],
+          "theme": "FS",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "3950",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false
+        },
+        {
+          "mid": [93],
+          "theme": "DarkTheme",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "3950",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false,
+          "upgrade": {
+            "device": {
+              "version": "v4.01",
+              "link": "/Mouse-Merge-554-V4.01-F83AD0FF.bin"
+            }
+          }
+        },
+        {
+          "mid": [97, 98],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "pulsar x1",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false
+        },
+        {
+          "mid": [99],
+          "theme": "DarkTheme",
+          "middleDpi": 3200,
+          "maxDpi": 32000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "3950",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false
+        },
+        {
+          "mid": [112, 114, 120, 124, 125],
+          "theme": "DarkTheme",
+          "middleDpi": 3200,
+          "maxDpi": 42000,
+          "mouse": "NRF52833",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [315, 0],
+              "line": [150, 15, 250, 15],
+              "index": 5,
+              "value": ["2", "0x0100"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "3955",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false
+        },
+        {
+          "mid": [121],
+          "theme": "General",
+          "middleDpi": 3200,
+          "maxDpi": 42000,
+          "mouse": "54",
+          "dongle1": "CX52650N",
+          "dongle2": "CX52650N",
+          "dongle4": "CH32V305",
+          "driverOnline": false,
+          "debounce": 2,
+          "tipsDebounce": 8,
+          "maxDebounce": 15,
+          "keys": [
+            {
+              "loc": [110, 0],
+              "line": [150, 15, 250, 15],
+              "index": 0,
+              "value": ["1", "0x0100"]
+            },
+            {
+              "loc": [110, 470],
+              "line": [0, 15, -100, 15],
+              "index": 1,
+              "value": ["1", "0x0200"]
+            },
+            {
+              "loc": [0, 240],
+              "line": [75, 0, 75, 120],
+              "index": 2,
+              "value": ["1", "0x0400"]
+            },
+            {
+              "loc": [203, 0],
+              "line": [150, 15, 210, 15],
+              "index": 4,
+              "value": ["1", "0x1000"]
+            },
+            {
+              "loc": [256, 0],
+              "line": [150, 15, 210, 15],
+              "index": 3,
+              "value": ["1", "0x0800"]
+            }
+          ],
+          "currentDpi": 1,
+          "dpis": [
+            {
+              "value": 400,
+              "color": "rgb(52,248,242)"
+            },
+            {
+              "value": 800,
+              "color": "rgb(0,0,255)"
+            },
+            {
+              "value": 1600,
+              "color": "rgb(0,255,0)"
+            },
+            {
+              "value": 3200,
+              "color": "rgb(255,255,0)"
+            },
+            {
+              "value": 6400,
+              "color": "rgb(255,163,0)"
+            },
+            {
+              "value": 12800,
+              "color": "rgb(242,10,234)"
+            }
+          ],
+          "reportRate": 1000,
+          "sensor": {
+            "type": "3955",
+            "lod": 1,
+            "motionSync": false,
+            "angle": false,
+            "ripple": false,
+            "performanceState": false,
+            "performance": 6,
+            "sensorMode": 0
+          },
+          "sleepTime": 6,
+          "dpiEffect": {
+            "mode": 0,
+            "brightness": 3,
+            "speed": 5
+          },
+          "angleTune": 0,
+          "powerSaveBattery": 0,
+          "longDistance": false
+        }
+      ],
+      "FanMIDList": [101]
+    }
+  ],
+  "pulsarDongle": [
+    {
+      "version": "v2.25",
+      "link": "/8K-Dongle-3710-5406-V2.25-213DD3B7.bin"
+    },
+    {
+      "version": "v2.08",
+      "link": "/Dongle-CD01-V2.08-61cd8c18.bin"
+    },
+    {
+      "version": "v4.07",
+      "link": "/Dongle-CD03-V4.07-8b781788.bin"
+    },
+    {
+      "version": "v4.00",
+      "link": "/8K-Dongle-3710-5406-V2.24-DC7B13B0.bin"
+    },
+    {
+      "version": "v5.04",
+      "link": "/Dongle-CD03-v5.04-5ED8B972.bin"
+    }
+  ]
+}

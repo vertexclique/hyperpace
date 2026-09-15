@@ -1,0 +1,195 @@
+{
+  "title": "PULSAR BIBIMBAP",
+  "web": "https://bbb.pulsar.gg/",
+  "version": "1.2.3",
+  "copyright": "© 2025 Pulsar. All rights reserved",
+  "opt": [
+    {
+      "vendorId": [
+        "0x3710"
+      ],
+      "productId": [
+        "0x5603",
+        "0x5406",
+        "0x5407",
+        "0x5501",
+        "0x5502",
+        "0x5503",
+        "0x5504",
+        "0x3414",
+        "0x3415",
+        "0x3501",
+        "0x3502",
+        "0x3503",
+        "0x3504",
+        "0x3505",
+        "0x3506",
+        "0x3507",
+        "0x3508",
+        "0x3509",
+        "0x3510",
+        "0x3511",
+        "0x3512",
+        "0x3513",
+        "0x3514",
+        "0x3515",
+        "0x3516",
+        "0x3517",
+        "0x3518",
+        "0x3519",
+        "0x3520",
+        "0x3521",
+        "0x3522",
+        "0x3523",
+        "0x3524",
+        "0x3525",
+        "0x3526",
+        "0x3527",
+        "0x3528",
+        "0x3529",
+        "0x7501",
+        "0x7502",
+        "0x7503",
+        "0x7504",
+        "0x7505",
+        "0x7506",
+        "0x7507",
+        "0x7508",
+        "0x7509",
+        "0x7510",
+        "0x9502",
+        "0x9601",
+        "0x7601",
+        "0xF004",
+        "0xF005",
+        "0x3601",
+        "0x5601",
+        "0x7602",
+        "0x7604",
+        "0x3603",
+        "0x7603",
+        "0x9503"
+      ],
+      "router": "/cMouse",
+      "getInfo": true
+    },
+    {
+      "vendorId": [
+        "0x3554"
+      ],
+      "productId": [
+        "0xF40A"
+      ],
+      "router": "/cMouse",
+      "getInfo": true
+    },
+    {
+      "vendorId": [
+        "0x3710"
+      ],
+      "productId": [
+        "0x2404",
+        "0x2502",
+        "0x2503",
+        "0x2504",
+        "0x2506",
+        "0x2507",
+        "0x8601"
+      ],
+      "router": "/sKey"
+    },
+    {
+      "vendorId": [
+        "0x3710"
+      ],
+      "productId": [
+        "0xF003"
+      ],
+      "router": "/sKey"
+    },
+    {
+      "vendorId": [
+        "0x3710"
+      ],
+      "productId": [
+        "0x5405",
+        "0x7401"
+      ],
+      "router": "/zywoo"
+    },
+    {
+      "vendorId": [
+        "0x3710"
+      ],
+      "productId": [
+        "0x2402",
+        "0x2403",
+        "0x2407",
+        "0x2408"
+      ],
+      "usagePage": "0xFF60",
+      "usage": "0x61",
+      "router": "/nKey"
+    }
+  ],
+  "home": {
+    "theme": "rgb(62,134,244)",
+    "font": "rgb(0,0,0)"
+  },
+  "light": {
+    "theme": "#0080FF",
+    "font": "#474C51",
+    "warning": "#F7444E",
+    "info": "#f1f1f1",
+    "back": "#FFFFFF",
+    "inactive": "#515151",
+    "border": "rgb(180,180,180)",
+    "keyInner": "rgb(255,255,255)",
+    "mini": "7px",
+    "small": "8px",
+    "medium": "10px",
+    "max": "12px"
+  },
+  "dark": {
+    "theme": "#0080FF",
+    "font": "#474C51",
+    "warning": "#F7444E",
+    "info": "#f1f1f1",
+    "back": "#FFFFFF",
+    "inactive": "#515151",
+    "border": "rgb(180,180,180)",
+    "keyInner": "rgb(255,255,255)",
+    "mini": "7px",
+    "small": "8px",
+    "medium": "10px",
+    "max": "12px"
+  },
+  "showBatteryValue": true,
+  "language": [
+    "ko",
+    "en",
+    "zh-CN",
+    "ja",
+    "de",
+    "es-ES",
+    "ru",
+    "pt-PT",
+    "en-PH",
+    "vi",
+    "th",
+    "in-ID",
+    "fr",
+    "tr",
+    "sv",
+    "en-MY",
+    "ar",
+    "en-IN",
+    "it",
+    "pl"
+  ],
+  "debug": {
+    "log": true,
+    "batteryPolling": true
+  },
+  "demo": false
+}
