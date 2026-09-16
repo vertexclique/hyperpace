@@ -7,7 +7,7 @@ SHELL := /usr/bin/env bash
 INFRA_DIR ?= infra
 DATE := $(shell date +%Y-%m-%d)
 
-.PHONY: help setup build test gate fmt lint doctor oracle \
+.PHONY: help setup build test gate fmt lint doctor oracle package-appimage \
         tf-fmt tf-validate tf-plan tf-apply infra-log clean
 
 help: ## list targets
@@ -64,3 +64,6 @@ clean: ## remove build output
 
 oracle: ## regenerate the hyperpace-protocol differential oracle fixture (sealed under bwrap)
 	@scripts/oracle.sh
+
+package-appimage: ## build deb/rpm/appimage and repair the AppImage (see dist/appimage/README.md)
+	@scripts/package-appimage.sh

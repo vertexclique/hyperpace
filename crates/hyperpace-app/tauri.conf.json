@@ -10,9 +10,43 @@
   },
   "build": {
     "frontendDist": "../../ui/build",
-    "beforeBuildCommand": "npm --prefix ../../ui run build"
+    "beforeBuildCommand": {
+      "script": "npm run build",
+      "cwd": "../../ui"
+    }
   },
   "bundle": {
-    "icon": ["icons/icon.png"]
+    "active": true,
+    "targets": ["deb", "rpm", "appimage"],
+    "icon": ["icons/icon.png"],
+    "category": "Utility",
+    "shortDescription": "Configure your mouse: buttons, DPI, lighting, macros and firmware",
+    "longDescription": "Hyperpace is a native desktop app that configures your mouse over its USB HID configuration channel: buttons, DPI stages and colors, polling rate, lighting, macros, profiles, the receiver, and firmware. It runs in the background with a tray icon showing battery, and the window can be closed without exiting. No cloud account, no vendor branding anywhere in the app.",
+    "license": "MIT OR Apache-2.0",
+    "homepage": "https://github.com/vertexclique/hyperpace",
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0"
+        ],
+        "files": {
+          "/usr/lib/udev/rules.d/70-hyperpace.rules": "../../dist/udev/70-hyperpace.rules"
+        },
+        "postInstallScript": "../../dist/udev/reload-udev-rules.sh",
+        "postRemoveScript": "../../dist/udev/reload-udev-rules.sh"
+      },
+      "rpm": {
+        "depends": [
+          "webkit2gtk4.1",
+          "gtk3"
+        ],
+        "files": {
+          "/usr/lib/udev/rules.d/70-hyperpace.rules": "../../dist/udev/70-hyperpace.rules"
+        },
+        "postInstallScript": "../../dist/udev/reload-udev-rules.sh",
+        "postRemoveScript": "../../dist/udev/reload-udev-rules.sh"
+      }
+    }
   }
 }

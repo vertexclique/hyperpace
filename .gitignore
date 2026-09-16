@@ -4,6 +4,12 @@
 /ui/.svelte-kit
 /ui/node_modules
 
+# makepkg build output (dist/arch/PKGBUILD is packaging input, not these)
+/dist/arch/pkg/
+/dist/arch/src/
+/dist/arch/*.pkg.tar.*
+/dist/arch/*.log
+
 # Editor and OS noise
 *.swp
 .DS_Store
