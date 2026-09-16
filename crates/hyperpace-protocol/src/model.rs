@@ -48,6 +48,16 @@ pub struct ModelTable {
     pub default_buttons: &'static [ButtonAction],
     /// Highest debounce value, in milliseconds, the vendor UI allows for this model.
     pub max_debounce_ms: u8,
+    /// Whether the mouse body has its own light strip. The settings block reserves a lighting record
+    /// on every model of this firmware platform, so its presence proves nothing; this is taken from
+    /// whether the vendor config gives the model a `lightEffect` entry, which is also what decides
+    /// whether the vendor's own app shows a lighting page for it.
+    pub body_lighting: bool,
+    /// Whether the model has a DPI indicator light with its own effect: the vendor config's
+    /// `dpiEffect` entry.
+    pub dpi_indicator: bool,
+    /// Whether the model supports long range mode: the vendor config's `longDistance` entry.
+    pub long_range: bool,
 }
 
 const OLD_3950_RANGES: &[DpiRange] = &[
@@ -101,6 +111,11 @@ pub const CID_102_MID_1: ModelTable = ModelTable {
     dpi_ranges: OLD_3950_RANGES,
     default_buttons: CID_102_DEFAULT_BUTTONS,
     max_debounce_ms: 15,
+    // `cfg.json#mouse[0].cfg[0]` has `dpiEffect` and `longDistance` but no `lightEffect`: this
+    // mouse has no body lighting, which its owner confirmed on the hardware.
+    body_lighting: false,
+    dpi_indicator: true,
+    long_range: true,
 };
 
 /// The production mouse page's table, mid 2: identical to mid 1 except for the mid the device
@@ -124,6 +139,10 @@ pub const CID_62_MID_1: ModelTable = ModelTable {
     dpi_ranges: NEW_3950_RANGES,
     default_buttons: CID_62_DEFAULT_BUTTONS,
     max_debounce_ms: 15,
+    // `home/cfg.json#mouse[0].cfg[0]` carries `lightEffect`, `dpiEffect` and `longDistance`.
+    body_lighting: true,
+    dpi_indicator: true,
+    long_range: true,
 };
 
 /// The model table for `cid` and `mid`, or `None` when the device reports a pair neither vendor
@@ -173,6 +192,17 @@ mod tests {
         assert_eq!(
             CID_62_MID_1.default_buttons.len(),
             usize::from(CID_62_MID_1.buttons)
+        );
+    }
+
+    #[test]
+    fn the_production_mouse_has_no_body_lighting_but_has_a_dpi_indicator() {
+        let production = table_for(102, 1)
+            .map(|table| (table.body_lighting, table.dpi_indicator, table.long_range));
+        assert_eq!(production, Some((false, true, true)));
+        assert_eq!(
+            table_for(62, 1).map(|table| table.body_lighting),
+            Some(true)
         );
     }
 }

@@ -215,6 +215,9 @@ mod tests {
             dpi_ranges: ranges,
             default_buttons: &[],
             max_debounce_ms: 15,
+            body_lighting: false,
+            dpi_indicator: false,
+            long_range: false,
         }
     }
 
