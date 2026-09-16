@@ -17,7 +17,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STATE="${XDG_RUNTIME_DIR:-/tmp}/hyperpace-dev"
 mkdir -p "$STATE"
 
-# One build and one capture at a time, even when several people or agents run this at once.
+# One build and one capture at a time, even when several people or agents run this at once. The
+# app started below must not inherit this descriptor (it is closed for it with `9>&-`): an instance
+# still holding the lock would block every later run for as long as it stays open.
 exec 9>"$STATE/lock"
 flock 9
 
@@ -33,7 +35,7 @@ HYPERPACE_SIMULATOR=1 \
 HYPERPACE_SIM_SHADOW="$SHADOW" \
 HYPERPACE_STORE_ROOT="$STATE/store" \
 HYPERPACE_START_SCREEN="$SCREEN" \
-    "$ROOT/target/debug/hyperpace" >"$STATE/app.log" 2>&1 &
+    "$ROOT/target/debug/hyperpace" >"$STATE/app.log" 2>&1 9>&- &
 echo $! >"$STATE/pid"
 
 sleep 8
