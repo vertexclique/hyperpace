@@ -118,6 +118,10 @@ fn check_cable(app: &AppHandle) {
     let Some(state) = app.try_state::<AppState>() else {
         return;
     };
+    if crate::dev::force_cable_blocked() {
+        state.set_cable_blocked(true);
+        return;
+    }
     match HidTransport::cable_state() {
         Ok(CableState::PermissionDenied) => {
             tracing::warn!(

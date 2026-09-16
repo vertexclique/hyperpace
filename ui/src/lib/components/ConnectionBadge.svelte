@@ -1,14 +1,7 @@
 <script lang="ts">
 	import { device, isTauriShell } from '../device.svelte';
-	import {
-		accessWarning,
-		accessWarningDetail,
-		linkDetail,
-		presenceLabel,
-		presenceOf,
-		statusLine,
-		toneOf
-	} from '../status';
+	import { accessWarning, linkDetail, presenceLabel, presenceOf, statusLine, toneOf } from '../status';
+	import HelpTip from './HelpTip.svelte';
 
 	let presence = $derived(presenceOf(device, isTauriShell));
 	let tone = $derived(toneOf(presence));
@@ -28,7 +21,11 @@
 	<span class="segment link mono">{detail}</span>
 {/if}
 {#if warning}
-	<span class="segment warning" title={accessWarningDetail(device) ?? ''}>{warning}</span>
+	<!-- The explanation is the fix, so it is a tip anyone can open from the status itself rather
+	     than a hover title they would have to discover. -->
+	<span class="segment">
+		<HelpTip topic="cableBlocked" label={warning} tone="warning" />
+	</span>
 {/if}
 
 <style>
@@ -56,14 +53,6 @@
 
 	.tone-neutral {
 		color: var(--color-muted);
-	}
-
-	.warning {
-		font-size: var(--text-xs);
-		font-weight: 600;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
-		color: var(--color-warning);
 	}
 
 	.link {

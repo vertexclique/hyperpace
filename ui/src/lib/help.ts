@@ -188,6 +188,13 @@ export const HELP = {
 		note: 'This cannot be undone. Save a profile first if you might want your settings back.'
 	},
 
+	// Connection problems.
+	cableBlocked: {
+		title: 'Cable not permitted',
+		body: 'The mouse is plugged in by its cable, but this computer does not let Hyperpace open it, so the mouse cannot be reached. While the cable is plugged in the mouse also stops answering through the receiver, which is why nothing else is shown.',
+		note: 'On Linux this is the device access rule: the installer packages add it for you, so unplug and replug the cable once. Running Hyperpace from a build directory instead, install the rule yourself from the project\'s dist/udev folder, reload the rules, then replug the cable. On macOS, allow Hyperpace under Privacy and Security, Input Monitoring. Unplugging the cable returns the mouse to the receiver in the meantime.'
+	},
+
 	// Settings.
 	deviceConnection: {
 		title: 'Device connection',

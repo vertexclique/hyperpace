@@ -90,7 +90,7 @@ pub async fn list_devices() -> Result<Vec<DeviceDescriptor>, String> {
         },
         DeviceDescriptor {
             backend: DeviceBackendDto::RealDevice,
-            label: "This device".to_owned(),
+            label: "This mouse".to_owned(),
             description: "The operator's own mouse. Read-only unless write access is requested."
                 .to_owned(),
         },

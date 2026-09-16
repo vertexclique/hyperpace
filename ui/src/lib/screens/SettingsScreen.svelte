@@ -13,7 +13,12 @@
 	import SelectField from '../components/SelectField.svelte';
 	import SegmentDial from '../controls/SegmentDial.svelte';
 
-	const PROFILE_OPTIONS = Array.from({ length: 8 }, (_, i) => ({ value: i, label: String(i) }));
+	// Four on-board profile slots, which is what this hardware has and what the vendor's own
+	// configurator offers. Eight was a guess and would have offered slots the mouse does not hold.
+	const PROFILE_OPTIONS = Array.from({ length: 4 }, (_, i) => ({
+		value: i,
+		label: `${i + 1}`
+	}));
 
 	// The app's own fallback when a preference has never been written (matches
 	// `extractAppSettings` in device.svelte.ts and the Rust side's own defaults), not a device
@@ -250,7 +255,7 @@
 						disabled={connectingBackend !== null}
 						onclick={() => connectTo(d.backend)}
 					>
-						{connectingBackend === d.backend ? 'Connecting...' : `Use ${d.label}`}
+						{connectingBackend === d.backend ? 'Connecting...' : `Switch to ${d.label.toLowerCase()}`}
 					</button>
 				{/each}
 			</div>

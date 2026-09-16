@@ -13,9 +13,16 @@
 	interface Props {
 		/** Which explanation to show. */
 		topic: HelpKey;
+		/**
+		 * Text for the trigger instead of a "?", for a tip that has to be noticed rather than looked
+		 * for: a connection problem, say, where the explanation is the fix.
+		 */
+		label?: string;
+		/** `warning` marks a trigger that reports something wrong. */
+		tone?: 'muted' | 'warning';
 	}
 
-	let { topic }: Props = $props();
+	let { topic, label, tone = 'muted' }: Props = $props();
 
 	const entry: HelpEntry = $derived(HELP[topic]);
 	const id = $props.id();
@@ -105,6 +112,8 @@
 	bind:this={button}
 	type="button"
 	class="help"
+	class:labelled={label !== undefined}
+	class:warning={tone === 'warning'}
 	class:open
 	aria-label="What {entry.title} does"
 	aria-describedby={open ? id : undefined}
@@ -118,7 +127,7 @@
 	}}
 	onclick={toggle}
 	onkeydown={onKeydown}
-	onpointerdown={(event) => event.stopPropagation()}>?</button
+	onpointerdown={(event) => event.stopPropagation()}>{label ?? '?'}</button
 >
 
 {#if open}
@@ -152,6 +161,30 @@
 		transition:
 			color var(--dur-settle) var(--ease-out),
 			border-color var(--dur-settle) var(--ease-out);
+	}
+
+	/* A labelled trigger reads as the status it reports, not as a question mark beside one. */
+	.help.labelled {
+		width: auto;
+		height: auto;
+		padding: var(--space-3xs) var(--space-2xs);
+		font-family: var(--font-body);
+		font-size: var(--text-xs);
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		white-space: nowrap;
+	}
+
+	.help.warning {
+		color: var(--color-warning);
+		border-color: var(--color-warning);
+		background: var(--color-warning-soft);
+	}
+
+	.help.warning:hover,
+	.help.warning.open {
+		color: var(--color-warning);
+		border-color: var(--color-warning);
 	}
 
 	.help:hover,

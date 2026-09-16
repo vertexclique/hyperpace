@@ -14,7 +14,9 @@
 //! - skip the single-instance guard and title its window "Hyperpace Simulator", so it runs next to
 //!   an ordinary instance and can be told apart from it,
 //! - open on the screen named by `HYPERPACE_START_SCREEN` (for example `lighting`), so a screen
-//!   can be captured without clicking to it.
+//!   can be captured without clicking to it,
+//! - report a cable it is not allowed to open when `HYPERPACE_FAKE_CABLE_BLOCKED` is set, a state
+//!   that otherwise depends on the operating system's own permissions.
 //!
 //! None of this is reachable without the environment variable, and nothing in it touches hardware.
 
@@ -28,6 +30,8 @@ const SHADOW_VAR: &str = "HYPERPACE_SIM_SHADOW";
 const STORE_ROOT_VAR: &str = "HYPERPACE_STORE_ROOT";
 /// The screen the window opens on.
 const START_SCREEN_VAR: &str = "HYPERPACE_START_SCREEN";
+/// Reports a cable this app is not allowed to open, so that state can be looked at.
+const CABLE_BLOCKED_VAR: &str = "HYPERPACE_FAKE_CABLE_BLOCKED";
 
 /// Whether this process runs in development mode.
 #[must_use]
@@ -69,6 +73,14 @@ pub fn start_screen_script() -> String {
         .map_or_else(String::new, |screen| {
             format!("window.__HYPERPACE_START_SCREEN__ = '{screen}';")
         })
+}
+
+/// Whether development mode should report a cable this app cannot open. There is no way to produce
+/// that state on demand from real hardware (it depends on the operating system's own permissions),
+/// and the interface has to be checked in it, so development mode can be told to report it.
+#[must_use]
+pub fn force_cable_blocked() -> bool {
+    simulator_mode() && std::env::var_os(CABLE_BLOCKED_VAR).is_some()
 }
 
 /// The main window's title.
