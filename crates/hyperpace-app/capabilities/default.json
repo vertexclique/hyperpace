@@ -19,6 +19,7 @@
     "allow-factory-reset",
     "allow-pair-receiver",
     "allow-receiver-light",
+    "allow-read-receiver-light",
     "allow-export-config",
     "allow-import-config",
     "allow-firmware-list",

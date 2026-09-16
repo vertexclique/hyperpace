@@ -327,6 +327,32 @@ pub struct ReceiverLightDto {
     pub time: u8,
 }
 
+impl From<ReceiverLight> for ReceiverLightDto {
+    fn from(light: ReceiverLight) -> Self {
+        Self {
+            mode: light.mode,
+            color: light.color,
+            speed: light.speed,
+            brightness: light.brightness,
+            time: light.time,
+        }
+    }
+}
+
+/// What reading the receiver's light found. [`Self::Reported`] carries data, so this is a tagged
+/// object on the wire, the same shape as the profile state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "camelCase")]
+pub enum ReceiverLightStateDto {
+    /// The receiver answered with its light as it is set now.
+    Reported {
+        /// The light's current settings.
+        light: ReceiverLightDto,
+    },
+    /// The receiver marked its light unsupported (status 1).
+    Unsupported,
+}
+
 impl From<ReceiverLightDto> for ReceiverLight {
     fn from(light: ReceiverLightDto) -> Self {
         Self {

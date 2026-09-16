@@ -25,6 +25,7 @@ pub const COMMANDS: &[&str] = &[
     "factory_reset",
     "pair_receiver",
     "receiver_light",
+    "read_receiver_light",
     "export_config",
     "import_config",
     "firmware_list",

@@ -25,6 +25,8 @@
 //! - [`icon`]: renders the battery percentage into the tray icon's own pixels.
 //! - [`tray`]: builds the tray icon and its menu, and updates them as the device state changes.
 //! - [`window`]: the main window's lifecycle, including hide-to-tray with the webview destroyed.
+//! - [`desktop_entry`]: on Linux, a per-user desktop entry and icon for a binary no package
+//!   installed, so the window shows the Hyperpace mark.
 //! - [`gpu_workaround`]: the Linux WebKitGTK/NVIDIA DMABUF blank-window workaround, applied before
 //!   the webview exists.
 //! - [`commands`]: every Tauri command in the API contract.
@@ -32,6 +34,7 @@
 pub mod autoconnect;
 pub mod blocking;
 pub mod commands;
+pub mod desktop_entry;
 pub mod dto;
 pub mod error;
 pub mod gpu_workaround;
@@ -129,6 +132,7 @@ pub fn run() -> Result<(), AppError> {
             commands::device::factory_reset,
             commands::device::pair_receiver,
             commands::device::receiver_light,
+            commands::device::read_receiver_light,
             commands::device::export_config,
             commands::device::import_config,
             commands::firmware::firmware_list,
@@ -141,6 +145,7 @@ pub fn run() -> Result<(), AppError> {
         .setup(move |app| {
             let handle = app.handle().clone();
             app.manage(AppState::new(store, store_root, handle.clone()));
+            desktop_entry::ensure_installed();
             tray::build(&handle)?;
             window::show_main_window(&handle)?;
             autoconnect::spawn(handle.clone());
@@ -149,7 +154,18 @@ pub fn run() -> Result<(), AppError> {
         })
         .build(tauri::generate_context!())?;
 
-    app.run(|_app_handle, _event| {});
+    app.run(|_app_handle, event| {
+        // Closing the window destroys it (`window::wire_close_to_tray`), and when the last window
+        // goes, the runtime asks to exit with no code. Refusing that is what keeps the app, the
+        // tray and the device connection alive in the background. An exit with a code is the tray's
+        // own Quit calling `AppHandle::exit`, which is allowed through.
+        if let tauri::RunEvent::ExitRequested {
+            code: None, api, ..
+        } = event
+        {
+            api.prevent_exit();
+        }
+    });
     Ok(())
 }
 

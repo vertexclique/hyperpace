@@ -16,7 +16,7 @@ pub use app_settings::{AppSettingsRequest, AppSettingsResponse};
 pub use device::{
     AccessDto, BatteryDto, ConnectRequest, DeviceBackendDto, DeviceDescriptor, DeviceEventPayload,
     DeviceIdentityDto, DeviceStateDto, LinkTypeDto, PairPhaseDto, PairStateDto, ReceiverLightDto,
-    StatusChangedDto,
+    ReceiverLightStateDto, StatusChangedDto,
 };
 pub use firmware::{
     FirmwareProgressPayload, FirmwareRecordDto, FirmwareWatchConfigDto, FirmwareWatchDirectoryDto,

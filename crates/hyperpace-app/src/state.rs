@@ -101,6 +101,9 @@ struct ActiveDevice {
     handle: DeviceHandle,
     backend: DeviceBackendDto,
     access: Access,
+    /// Whether the transport is the mouse's own cable rather than the receiver. Known from the
+    /// moment the transport opens, before the device has said anything.
+    wired: bool,
     tracked: TrackedState,
 }
 
@@ -170,7 +173,7 @@ impl AppState {
             DeviceBackendDto::Simulator
         };
         let access: Access = access.into();
-        let handle = open_connection(backend, access)?;
+        let (handle, wired) = open_connection(backend, access)?;
 
         let id = self.connection_id.fetch_add(1, Ordering::SeqCst) + 1;
         spawn_tracker(self.app.clone(), id, &handle)?;
@@ -178,6 +181,7 @@ impl AppState {
             handle,
             backend,
             access,
+            wired,
             tracked: TrackedState::default(),
         });
         Ok(self.snapshot())
@@ -334,6 +338,22 @@ impl AppState {
         ))
     }
 
+    /// Whether the current connection is to the real device over its cable: `Some(true)` for the
+    /// cable, `Some(false)` for the receiver, `None` when there is no real-device connection.
+    pub(crate) fn real_connection_wired(&self) -> Option<bool> {
+        lock(&self.device)
+            .as_ref()
+            .filter(|active| active.backend == DeviceBackendDto::RealDevice)
+            .map(|active| active.wired)
+    }
+
+    /// The identity the current connection resolved, if it has one yet.
+    pub(crate) fn identity(&self) -> Option<DeviceIdentity> {
+        lock(&self.device)
+            .as_ref()
+            .and_then(|active| active.tracked.identity)
+    }
+
     /// The current connection's backend, for a caller (firmware install) that must refuse to
     /// proceed against the simulator.
     ///
@@ -385,16 +405,24 @@ fn read_low_battery_threshold(store: &Store) -> u8 {
         .unwrap_or(DEFAULT_LOW_BATTERY_THRESHOLD)
 }
 
-/// Open a transport for `backend` and spawn its owner thread.
-fn open_connection(backend: DeviceBackendDto, access: Access) -> Result<DeviceHandle, AppError> {
-    let transport: Box<dyn Transport> = match backend {
+/// Open a transport for `backend` and spawn its owner thread, returning the handle and whether
+/// the transport is the mouse's own cable.
+fn open_connection(
+    backend: DeviceBackendDto,
+    access: Access,
+) -> Result<(DeviceHandle, bool), AppError> {
+    let (transport, wired): (Box<dyn Transport>, bool) = match backend {
         DeviceBackendDto::Simulator => {
             let (transport, _controller) = SimTransport::new(SIM_CID, SIM_MID, SIM_LINK_BYTE);
-            Box::new(transport)
+            (Box::new(transport), false)
         }
-        DeviceBackendDto::RealDevice => Box::new(HidTransport::open_first()?),
+        DeviceBackendDto::RealDevice => {
+            let transport = HidTransport::open_first()?;
+            let wired = transport.is_wired();
+            (Box::new(transport), wired)
+        }
     };
-    Ok(hyperpace_device::spawn(transport, access)?)
+    Ok((hyperpace_device::spawn(transport, access)?, wired))
 }
 
 /// The history line one device event deserves, or `None` for an event that is a poll rather than a

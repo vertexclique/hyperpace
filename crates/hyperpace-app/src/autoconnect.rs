@@ -16,7 +16,7 @@
 
 use std::thread;
 
-use hyperpace_device::{DeviceError, DeviceEvent, HotplugEvent};
+use hyperpace_device::{DeviceError, DeviceEvent, HidTransport, HotplugEvent};
 use tauri::{AppHandle, Manager};
 
 use crate::dto::{AccessDto, DeviceBackendDto, DeviceEventPayload};
@@ -61,16 +61,32 @@ fn run(app: &AppHandle) {
     let Some(events) = events else { return };
     for event in events {
         match event {
-            HotplugEvent::Added => try_connect(app),
+            HotplugEvent::Added => {
+                // The cable being plugged in shows up as an addition. A mouse on its cable stops
+                // answering through the receiver, so a receiver connection has to give way to it.
+                if cable_now_preferred(app) {
+                    drop_real_connection(app);
+                }
+                try_connect(app);
+            }
             HotplugEvent::Removed => {
                 // One attached collection went away. Drop what may now be a dead connection, then
-                // try once: if the mouse is still here and something else was unplugged, this
-                // reconnects it, and if it is gone the attempt simply fails.
+                // try once: if the mouse is still here (the cable was pulled and the receiver takes
+                // over, or something unrelated was unplugged) this reconnects it, and if it is gone
+                // the attempt simply fails.
                 drop_real_connection(app);
                 try_connect(app);
             }
         }
     }
+}
+
+/// Whether the live connection goes through the receiver while the mouse's cable is now attached.
+fn cable_now_preferred(app: &AppHandle) -> bool {
+    let Some(state) = app.try_state::<AppState>() else {
+        return false;
+    };
+    state.real_connection_wired() == Some(false) && HidTransport::wired_attached().unwrap_or(false)
 }
 
 /// Connect to the real device, unless something is already connected.

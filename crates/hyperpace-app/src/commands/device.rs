@@ -23,7 +23,7 @@ use crate::blocking::blocking;
 use crate::dto::{
     ConnectRequest, DeviceBackendDto, DeviceDescriptor, DeviceEventPayload, DeviceStateDto,
     KeystrokeDto, LightingDto, LongRangeDto, PairPhaseDto, PairStateDto, ProfileDto,
-    ReceiverLightDto, SetButtonRequest, SettingsDto, WriteSettingRequest,
+    ReceiverLightDto, ReceiverLightStateDto, SetButtonRequest, SettingsDto, WriteSettingRequest,
 };
 use crate::error::{AppError, to_command_result};
 use crate::state::{AppState, REQUEST_TIMEOUT};
@@ -327,7 +327,15 @@ pub async fn pair_receiver(
         blocking(move || {
             let state = app.state::<AppState>();
             let handle = state.handle()?;
-            run_pairing(&handle, PAIR_POLL_INTERVAL, MAX_PAIR_POLLS, |update| {
+            // The receiver pairs with a mouse of a given model. A receiver with no mouse answering
+            // yet (the usual reason to pair at all) has no identity to take it from, so the
+            // production model this app targets stands in, as the vendor driver's own page does.
+            let cid = state
+                .identity()
+                .map_or(hyperpace_protocol::model::CID_102_MID_1.cid, |identity| {
+                    identity.cid
+                });
+            run_pairing(&handle, cid, PAIR_POLL_INTERVAL, MAX_PAIR_POLLS, |update| {
                 let _ = channel.send(update);
             })
         })
@@ -348,11 +356,12 @@ pub async fn pair_receiver(
 /// status-1 (unsupported) `EnterPair` reply rather than polling a session that never started.
 fn run_pairing(
     handle: &DeviceHandle,
+    cid: u8,
     poll_interval: Duration,
     max_polls: u32,
     mut on_update: impl FnMut(PairStateDto),
 ) -> Result<PairStateDto, AppError> {
-    let enter_reply = handle.request(Command::EnterPair.request(), REQUEST_TIMEOUT)?;
+    let enter_reply = handle.request(request::enter_pair(cid), REQUEST_TIMEOUT)?;
     require_supported(&enter_reply)?;
 
     for _ in 0..max_polls {
@@ -390,6 +399,37 @@ pub async fn receiver_light(app: AppHandle, light: ReceiverLightDto) -> Result<(
         })
         .await,
     )
+}
+
+/// Read the receiver's own indicator light as it is set now.
+///
+/// The receiver answers this itself, so it works while the mouse sleeps.
+///
+/// # Errors
+///
+/// Returns an error message when nothing is connected or the receiver did not answer in time.
+#[tauri::command]
+pub async fn read_receiver_light(app: AppHandle) -> Result<ReceiverLightStateDto, String> {
+    to_command_result(
+        blocking(move || {
+            let state = app.state::<AppState>();
+            let handle = state.handle()?;
+            query_receiver_light(&handle)
+        })
+        .await,
+    )
+}
+
+/// Query `GetDongleLight` (25), mapping a status-1 reply to an honest unsupported state.
+fn query_receiver_light(handle: &DeviceHandle) -> Result<ReceiverLightStateDto, AppError> {
+    let reply = handle.request(Command::GetReceiverLight.request(), REQUEST_TIMEOUT)?;
+    match response::receiver_light(&reply) {
+        Ok(light) => Ok(ReceiverLightStateDto::Reported {
+            light: light.into(),
+        }),
+        Err(ProtocolError::Unsupported { .. }) => Ok(ReceiverLightStateDto::Unsupported),
+        Err(other) => Err(other.into()),
+    }
 }
 
 /// Send `SetDongleLight` (24) and report honestly when the device marked it unsupported (the NEW
@@ -845,6 +885,35 @@ mod tests {
     }
 
     #[test]
+    fn the_receiver_light_reads_back_what_was_set() {
+        let (handle, _controller) = connected_handle_with_controller();
+        let light = ReceiverLight {
+            mode: 2,
+            color: (10, 20, 30),
+            speed: 4,
+            brightness: 7,
+            time: 1,
+        };
+        apply_receiver_light(&handle, light).unwrap();
+        assert_eq!(
+            query_receiver_light(&handle).unwrap(),
+            ReceiverLightStateDto::Reported {
+                light: light.into()
+            }
+        );
+    }
+
+    #[test]
+    fn the_receiver_light_reports_unsupported_honestly() {
+        let (handle, controller) = connected_handle_with_controller();
+        controller.set_unsupported(25, true);
+        assert_eq!(
+            query_receiver_light(&handle).unwrap(),
+            ReceiverLightStateDto::Unsupported
+        );
+    }
+
+    #[test]
     fn query_long_range_reports_unsupported_honestly_not_as_off() {
         let (handle, controller) = connected_handle_with_controller();
         controller.set_unsupported(23, true);
@@ -960,8 +1029,10 @@ mod tests {
         let (handle, controller) = connected_handle_with_controller();
         controller.set_pair_outcome(true, 2);
         let mut updates = Vec::new();
-        let result =
-            run_pairing(&handle, Duration::ZERO, 20, |update| updates.push(update)).unwrap();
+        let result = run_pairing(&handle, 102, Duration::ZERO, 20, |update| {
+            updates.push(update);
+        })
+        .unwrap();
         assert_eq!(result.state, PairPhaseDto::Succeeded);
         assert_eq!(updates.first().unwrap().state, PairPhaseDto::Pairing);
         assert_eq!(updates.last().unwrap().state, PairPhaseDto::Succeeded);
@@ -971,7 +1042,7 @@ mod tests {
     fn run_pairing_reports_failure() {
         let (handle, controller) = connected_handle_with_controller();
         controller.set_pair_outcome(false, 1);
-        let result = run_pairing(&handle, Duration::ZERO, 20, |_| {}).unwrap();
+        let result = run_pairing(&handle, 102, Duration::ZERO, 20, |_| {}).unwrap();
         assert_eq!(result.state, PairPhaseDto::Failed);
     }
 
@@ -980,7 +1051,7 @@ mod tests {
         let (handle, controller) = connected_handle_with_controller();
         // Configured to resolve well past the poll budget this call allows.
         controller.set_pair_outcome(true, 100);
-        let result = run_pairing(&handle, Duration::ZERO, 3, |_| {}).unwrap();
+        let result = run_pairing(&handle, 102, Duration::ZERO, 3, |_| {}).unwrap();
         assert_eq!(result.state, PairPhaseDto::Failed);
     }
 
@@ -988,7 +1059,7 @@ mod tests {
     fn run_pairing_reports_unsupported_honestly_when_enter_pair_is_unsupported() {
         let (handle, controller) = connected_handle_with_controller();
         controller.set_unsupported(5, true);
-        let error = run_pairing(&handle, Duration::ZERO, 20, |_| {}).unwrap_err();
+        let error = run_pairing(&handle, 102, Duration::ZERO, 20, |_| {}).unwrap_err();
         assert!(matches!(
             error,
             AppError::Protocol(ProtocolError::Unsupported { command: 5 })
