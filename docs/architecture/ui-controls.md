@@ -9,8 +9,12 @@ current position at a glance, which a select does not, and it reads as an instru
 a form. The vendor's own configurator uses the same model, so the interaction will be familiar to
 anyone coming from it.
 
-Everything here is drawn by Hyperpace as inline SVG. No vendor artwork, no bitmap dial faces, no
-vendor name, logo or model string anywhere in the interface.
+The dial faces and the device renders are the manufacturer's own art, shipped in
+`ui/static/device/` and catalogued in `ui/static/device/PROVENANCE.md`. The operator authorized
+their use on 2026-09-16. Hyperpace draws the live arc, the labels, the readouts and every piece of
+chrome itself, so the value always carries this app's accent. No vendor name, logo or model string
+appears in the app's own chrome, copy, binary or package metadata; the wordmark printed on the
+physical device is visible in the device renders because it is part of the hardware.
 
 ## 1. Reference geometry
 
@@ -28,9 +32,12 @@ them to fit its own window (see section 5).
 | Receiver speed | 160 | 20 | 14 | half ring, top half only |
 | DPI, polling rate, debounce | n/a | continuous or stepped | n/a | linear slider |
 
-The vendor draws its arcs with a CSS conic gradient and rotates a bitmap pointer over a bitmap
-face. Hyperpace draws arcs and ticks as SVG paths instead, so the control is sharp at any size,
-themable from CSS variables, and needs no image assets.
+The measurements above are the native pixel dimensions of the shipped face bitmaps, so the
+control is built at true size: the face at its native diameter, the pointer sprite rotated about
+its bottom edge at the dial centre (`transform-origin: 50% 100%`), and the live arc drawn by
+Hyperpace as an SVG path over the face in `--color-accent`. The two faces that carry the vendor's
+orange baked into their pixels, `sensor/performance_on.png` and `performance_off.png`, are not
+used; Hyperpace draws those segments itself.
 
 ## 2. Primitives
 
@@ -100,7 +107,9 @@ one hero control on a screen (sleep time on Performance, for example).
 
 ## 6. Colour
 
-From the existing dark palette: track at the panel border colour, fill at the accent, pointer at
-the foreground colour, labels at the muted foreground, and the active label at the accent. The
+From the palette in `design.md`: the face bitmap is left white and untinted, the live arc is
+`--color-accent`, the empty track is `--color-rule`, labels are `--color-muted`, and the active
+label is `--color-accent`. Nothing around a dial is round: frames, readouts and captions follow
+the cut plate. The
 DPI stage colours are the exception: each stage's own colour fills its slider handle and its
 swatch, because that colour is data the mouse stores, not decoration.
