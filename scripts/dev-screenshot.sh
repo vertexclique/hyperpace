@@ -38,7 +38,6 @@ HYPERPACE_START_SCREEN="$SCREEN" \
     "$ROOT/target/debug/hyperpace" >"$STATE/app.log" 2>&1 9>&- &
 echo $! >"$STATE/pid"
 
-sleep 8
 cat >"$STATE/raise.js" <<'JS'
 var wins = workspace.windowList();
 for (var i = 0; i < wins.length; i++) {
@@ -48,9 +47,32 @@ for (var i = 0; i < wins.length; i++) {
     }
 }
 JS
-ID=$(qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$STATE/raise.js")
-qdbus6 org.kde.KWin "/Scripting/Script$ID" org.kde.kwin.Script.run >/dev/null
-qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "$STATE/raise.js" >/dev/null 2>&1 || true
-sleep 1
-spectacle -b -n -a -o "$OUT"
+
+# Wait for the screen to actually render instead of for a fixed time: on a busy machine the window
+# can sit blank for a long while, and a blank capture looks like a finished one. The interface is
+# dark, so a capture whose content is mostly white has not painted yet. Up to two minutes.
+if command -v magick >/dev/null; then MAGICK=magick; else MAGICK=convert; fi
+DEADLINE=$((SECONDS + 120))
+RENDERED=0
+while (( SECONDS < DEADLINE )); do
+    sleep 3
+    ID=$(qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$STATE/raise.js")
+    qdbus6 org.kde.KWin "/Scripting/Script$ID" org.kde.kwin.Script.run >/dev/null
+    qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "$STATE/raise.js" >/dev/null 2>&1 || true
+    sleep 1
+    spectacle -b -n -a -o "$OUT" 2>/dev/null || continue
+    [[ -s "$OUT" ]] || continue
+    # Mean brightness of the window's content, below its title bar and away from its frame.
+    # Alpha is dropped first: averaged in, the transparent shadow around the window makes a fully
+    # rendered dark screen measure mid-grey. Measured on this app: rendered about 0.09, blank 1.0.
+    MEAN=$($MAGICK "$OUT" -alpha off -gravity center -crop 50%x50%+0+0 +repage -colorspace Gray -format "%[fx:mean]" info: 2>/dev/null || echo 1)
+    if awk -v m="$MEAN" 'BEGIN { exit !(m < 0.5) }'; then
+        RENDERED=1
+        break
+    fi
+done
+if (( RENDERED == 0 )); then
+    echo "the window never rendered within two minutes; see $STATE/app.log" >&2
+    exit 1
+fi
 echo "captured $SCREEN -> $OUT"
