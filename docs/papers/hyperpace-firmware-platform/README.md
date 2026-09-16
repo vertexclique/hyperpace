@@ -73,4 +73,16 @@ vendor web driver).
 
 ## What was gathered
 
-Filled in when the streams complete.
+- 137 sources with 137 summaries, plus `sources/_searchlog-*.md` for each stream.
+- Two verification workflows: protocol cross-check (44 agents, 401 facts, 304 confirmed, 96
+  corrected, 1 refuted) and firmware verification (27 agents, 138 spec and gap facts, 14 claims,
+  37 firmware candidates).
+- Deliverables: `JUDGEMENT.md` (the handoff to planning), `FIRMWARE-VERDICT.md`,
+  `../../research/mouse-protocol-v2.md`, `../../research/firmware-update-spec.md`.
+- Primary local data: the target's HID report descriptors (sysfs) and sha256 comparison of the
+  four vendor page deployments.
+- `firmware/archive/`: 35 sibling images plus packages under `other-devices/`, all five slots for
+  this hardware empty, ledger in `firmware/archive/SOURCES.md`.
+
+Both completeness critics were still reporting new gaps in their final rounds (10 and 9), so this
+body of work is complete for what it cites and incomplete as a survey.
