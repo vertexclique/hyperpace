@@ -14,7 +14,9 @@
 //!   reads; the access it asks for only decides whether a later write the operator makes in the
 //!   interface is allowed to reach the device at all.
 
+use std::sync::mpsc;
 use std::thread;
+use std::time::Duration;
 
 use hyperpace_device::{CableState, DeviceError, DeviceEvent, HidTransport, HotplugEvent};
 use tauri::{AppHandle, Manager};
@@ -22,6 +24,13 @@ use tauri::{AppHandle, Manager};
 use crate::dto::{AccessDto, DeviceBackendDto, DeviceEventPayload};
 use crate::error::AppError;
 use crate::state::AppState;
+
+/// How often the watcher re-examines the connection when nothing has been plugged or unplugged.
+///
+/// Granting this app access to the cable is not a hotplug event, and neither is a mouse that starts
+/// answering again, so the picture is re-checked on this cadence as well. Enumerating costs little
+/// and this is not a hot path.
+const RECHECK_INTERVAL: Duration = Duration::from_secs(2);
 
 /// The access an automatic connection asks for.
 ///
@@ -59,7 +68,22 @@ fn run(app: &AppHandle) {
     try_connect(app);
 
     let Some(events) = events else { return };
-    for event in events {
+    loop {
+        let event = match events.recv_timeout(RECHECK_INTERVAL) {
+            Ok(event) => event,
+            // Nothing was plugged or unplugged, but other things change the picture: a cable this
+            // app was not allowed to open becomes usable the moment the access rule is applied, and
+            // that is not a hotplug event. Without this check the app would sit on the receiver,
+            // reporting a mouse it cannot reach, until something was physically replugged.
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                if cable_now_preferred(app) {
+                    drop_real_connection(app);
+                }
+                try_connect(app);
+                continue;
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => return,
+        };
         match event {
             HotplugEvent::Added => {
                 // The cable being plugged in shows up as an addition. A mouse on its cable stops

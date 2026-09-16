@@ -187,6 +187,10 @@ impl AppState {
         };
         let access: Access = access.into();
         let (handle, wired) = open_connection(backend, access)?;
+        tracing::info!(
+            link = if wired { "cable" } else { "2.4 GHz receiver" },
+            "opened the device"
+        );
 
         let id = self.connection_id.fetch_add(1, Ordering::SeqCst) + 1;
         spawn_tracker(self.app.clone(), id, &handle)?;
