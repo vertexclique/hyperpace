@@ -9,6 +9,7 @@ import { invoke, openDeviceEventChannel, openFirmwareProgressChannel, runningInT
 import {
 	AUTOSTART_KEY,
 	DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT,
+	FIRMWARE_WATCH_ENABLED_KEY,
 	LOW_BATTERY_THRESHOLD_KEY,
 	MINIMIZE_TO_TRAY_KEY
 } from './types';
@@ -27,6 +28,7 @@ import type {
 	DeviceState,
 	FirmwareProgress,
 	FirmwareRecord,
+	FirmwareWatchReport,
 	Keystroke,
 	MacroRecord,
 	PairState,
@@ -43,18 +45,23 @@ import type {
 const APP_SETTING_KEYS: [keyof AppSettings, string][] = [
 	['autostart', AUTOSTART_KEY],
 	['lowBatteryThresholdPercent', LOW_BATTERY_THRESHOLD_KEY],
-	['minimizeToTray', MINIMIZE_TO_TRAY_KEY]
+	['minimizeToTray', MINIMIZE_TO_TRAY_KEY],
+	['firmwareWatchEnabled', FIRMWARE_WATCH_ENABLED_KEY]
 ];
 
 function extractAppSettings(settings: Record<string, unknown>): AppSettings {
 	const autostart = settings[AUTOSTART_KEY];
 	const threshold = settings[LOW_BATTERY_THRESHOLD_KEY];
 	const minimizeToTray = settings[MINIMIZE_TO_TRAY_KEY];
+	const firmwareWatchEnabled = settings[FIRMWARE_WATCH_ENABLED_KEY];
 	return {
 		autostart: typeof autostart === 'boolean' ? autostart : false,
 		lowBatteryThresholdPercent:
 			typeof threshold === 'number' ? threshold : DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT,
-		minimizeToTray: typeof minimizeToTray === 'boolean' ? minimizeToTray : false
+		minimizeToTray: typeof minimizeToTray === 'boolean' ? minimizeToTray : false,
+		// Absent means enabled, matching the Rust side's own default
+		// (`commands::firmware_watch::watch_enabled`).
+		firmwareWatchEnabled: typeof firmwareWatchEnabled === 'boolean' ? firmwareWatchEnabled : true
 	};
 }
 
@@ -145,6 +152,9 @@ class DeviceStore {
 	 * connected device currently reports, not the whole archive. */
 	firmwareUpdates = $state<FirmwareRecord[]>([]);
 	firmwareProgress = $state<FirmwareProgress | null>(null);
+	/** Result of the most recent `checkFirmwarePublication` (route 1, "watch for publication").
+	 * Never implies a package was found; see its own `hasFindings`/`disclaimer` fields. */
+	firmwareWatchReport = $state<FirmwareWatchReport | null>(null);
 
 	appSettings = $state<AppSettings | null>(null);
 
@@ -385,6 +395,17 @@ class DeviceStore {
 			this.firmwareUpdates = await invoke<FirmwareRecord[]>('firmware_check_for_updates');
 		} catch (err) {
 			this.fail('Could not check for firmware updates', err);
+		}
+	}
+
+	/** Route 1, "watch for publication": fetches the vendor's own config files and firmware
+	 * directory paths and reports what changed. Never downloads or installs anything, and a
+	 * result never implies firmware was found; render `summary`/`disclaimer` as returned. */
+	async checkFirmwarePublication() {
+		try {
+			this.firmwareWatchReport = await invoke<FirmwareWatchReport>('firmware_watch_check');
+		} catch (err) {
+			this.fail('Could not check for firmware publication', err);
 		}
 	}
 

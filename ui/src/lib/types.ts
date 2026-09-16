@@ -344,6 +344,41 @@ export interface FirmwareProgress {
 	percent: number;
 }
 
+// Route 1 ("watch for publication"): the result of `firmware_watch_check`. Every field here
+// mirrors `dto::firmware::FirmwareWatchReportDto` and its nested shapes field-for-field; `summary`
+// is already the full human-readable line (including the evidence disclaimer where relevant), so a
+// screen renders it as-is rather than reconstructing wording itself.
+
+export interface FirmwareWatchConfig {
+	url: string;
+	description: string;
+	changed: boolean;
+	evidence: string[];
+	summary: string;
+}
+
+export interface FirmwareWatchDirectory {
+	url: string;
+	description: string;
+	notable: boolean;
+	summary: string;
+}
+
+export interface FirmwareWatchFetchError {
+	url: string;
+	reason: string;
+}
+
+export interface FirmwareWatchReport {
+	configs: FirmwareWatchConfig[];
+	directories: FirmwareWatchDirectory[];
+	fetchErrors: FirmwareWatchFetchError[];
+	hasFindings: boolean;
+	disclaimer: string;
+	/// Unix seconds.
+	checkedAt: number;
+}
+
 // ---- dto/app_settings.rs ----
 
 export type AppSettingsRequest = { action: 'get' } | { action: 'set'; key: string; value: unknown };
@@ -358,14 +393,18 @@ export interface AppSettingsResponse {
 export const LOW_BATTERY_THRESHOLD_KEY = 'low_battery_threshold_percent';
 export const AUTOSTART_KEY = 'autostart';
 export const MINIMIZE_TO_TRAY_KEY = 'minimize_to_tray';
+// Mirrors `commands::firmware_watch::FIRMWARE_WATCH_ENABLED_KEY`. Absent means enabled, matching
+// the Rust side's own default (all three acquisition routes ship enabled).
+export const FIRMWARE_WATCH_ENABLED_KEY = 'firmware_watch_enabled';
 
 /// The app settings this UI's Settings screen edits, extracted from `AppSettingsResponse.settings`
 /// with the same defaults `hyperpace-app` itself falls back to when a key has never been written
-/// (`state::DEFAULT_LOW_BATTERY_THRESHOLD`).
+/// (`state::DEFAULT_LOW_BATTERY_THRESHOLD`, `commands::firmware_watch::watch_enabled`).
 export interface AppSettings {
 	autostart: boolean;
 	lowBatteryThresholdPercent: number;
 	minimizeToTray: boolean;
+	firmwareWatchEnabled: boolean;
 }
 
 export const DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT = 15;

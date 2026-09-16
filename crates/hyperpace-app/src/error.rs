@@ -41,6 +41,14 @@ pub enum AppError {
     /// The device did not answer the reconnect probe after entering update mode within the
     /// bounded window this crate allows.
     FirmwareReconnectTimeout,
+    /// The operator turned the firmware watch route off (`app_settings`'s
+    /// `firmware_watch_enabled` key; `commands::firmware_watch::FIRMWARE_WATCH_ENABLED_KEY`).
+    FirmwareWatchDisabled,
+    /// The HTTP client the firmware watch route needs could not be built, or a request it sent
+    /// failed outright (a per-target fetch failure inside a check is not this: it is recorded in
+    /// the report's `fetch_errors` instead, so one unreachable target never fails the whole
+    /// check).
+    Http(reqwest::Error),
     /// The device layer reported an error.
     Device(DeviceError),
     /// The protocol codec reported an error.
@@ -80,6 +88,11 @@ impl fmt::Display for AppError {
                 f,
                 "the device did not reappear in update mode before the timeout"
             ),
+            Self::FirmwareWatchDisabled => write!(
+                f,
+                "checking for firmware publication is turned off in app preferences"
+            ),
+            Self::Http(error) => write!(f, "could not reach the vendor site: {error}"),
             Self::Device(error) => write!(f, "{error}"),
             Self::Protocol(error) => write!(f, "{error}"),
             Self::Config(error) => write!(f, "{error}"),
@@ -101,6 +114,7 @@ impl core::error::Error for AppError {
             Self::Store(error) => Some(error),
             Self::Io(error) => Some(error),
             Self::Tauri(error) => Some(error),
+            Self::Http(error) => Some(error),
             _ => None,
         }
     }
@@ -148,6 +162,12 @@ impl From<tauri::Error> for AppError {
     }
 }
 
+impl From<reqwest::Error> for AppError {
+    fn from(error: reqwest::Error) -> Self {
+        Self::Http(error)
+    }
+}
+
 /// Turn any command result into the `Result<T, String>` shape the API contract fixes.
 ///
 /// # Errors
@@ -173,6 +193,7 @@ mod tests {
             AppError::FirmwareWriteNotAuthorized,
             AppError::FirmwareSimulatorUnsupported,
             AppError::FirmwareReconnectTimeout,
+            AppError::FirmwareWatchDisabled,
             AppError::Device(DeviceError::Disconnected),
         ];
         for variant in variants {

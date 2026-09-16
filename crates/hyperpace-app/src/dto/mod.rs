@@ -18,7 +18,10 @@ pub use device::{
     DeviceIdentityDto, DeviceStateDto, LinkTypeDto, PairPhaseDto, PairStateDto, ReceiverLightDto,
     StatusChangedDto,
 };
-pub use firmware::{FirmwareProgressPayload, FirmwareRecordDto};
+pub use firmware::{
+    FirmwareProgressPayload, FirmwareRecordDto, FirmwareWatchConfigDto, FirmwareWatchDirectoryDto,
+    FirmwareWatchFetchErrorDto, FirmwareWatchReportDto,
+};
 pub use macros::{MacroEventDto, MacroRecordDto, SaveMacroRequest};
 pub use settings::{
     ButtonActionDto, DpiActionDto, DpiIndicatorDto, DpiIndicatorModeDto, DpiStageDto, KeystrokeDto,

@@ -8,5 +8,6 @@
 
 pub mod device;
 pub mod firmware;
+pub mod firmware_watch;
 pub mod macros;
 pub mod settings;

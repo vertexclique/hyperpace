@@ -175,10 +175,34 @@ pub struct Guards { pub checksum_ok: bool, pub identity: Match, pub battery_perc
 pub fn preflight(pkg: &Package, id: &DeviceIdentity, battery: Option<u8>) -> Result<(), FirmwareError>;
 pub fn flash<T: Transport>(pkg: &Package, target: &mut T, progress: &mut dyn FnMut(Progress))
     -> Result<(), FirmwareError>;
+
+// watch.rs: route 1 ("watch for publication"), pure evaluation; never fetches a URL itself
+pub struct ConfigTarget { pub url: &'static str, pub description: &'static str,
+                          pub recorded_sha256: &'static str }
+pub const CONFIG_TARGETS: &[ConfigTarget];        // the two config files FIRMWARE-VERDICT.md names
+pub struct DirectoryTarget { pub url: &'static str, pub description: &'static str }
+pub const DIRECTORY_TARGETS: &[DirectoryTarget];  // the firmware directory paths it names
+pub const RECORDED_SPA_INDEX_SHA256: &str;        // the directory oracle's "missing" fallback hash
+pub const EVIDENCE_DISCLAIMER: &str;              // a hash change alone is not proof of firmware
+pub struct ConfigFinding { pub url: &'static str, pub description: &'static str,
+    pub recorded_sha256: &'static str, pub fetched_sha256: String, pub changed: bool,
+    pub evidence: Vec<String> }                   // evidence: quoted only when changed is true
+pub enum DirectoryState { MissingAsRecorded, ExistsAsDirectory,
+    ContentChanged { fetched_sha256: String }, Unexpected { status: u16 } }
+pub struct DirectoryFinding { pub url: &'static str, pub description: &'static str,
+                              pub state: DirectoryState }
+pub struct WatchReport { pub configs: Vec<ConfigFinding>, pub directories: Vec<DirectoryFinding>,
+                         pub fetch_errors: Vec<(String, String)> }
+impl WatchReport { pub fn has_findings(&self) -> bool }
+pub fn evaluate_config(target: &ConfigTarget, body: &[u8]) -> ConfigFinding;
+pub fn evaluate_directory(target: &DirectoryTarget, status: u16, body: &[u8]) -> DirectoryFinding;
 ```
 
 `flash` streams 32 byte packets straight from the package bytes, never buffering an image, and
-refuses to start unless `preflight` passed. Nothing in this crate opens a device.
+refuses to start unless `preflight` passed. Nothing in this crate opens a device; `watch` extends
+that to never fetching a URL either. `hyperpace-app`'s `commands::firmware_watch` owns the actual
+HTTP fetch (a bounded, timed-out `reqwest::blocking::Client`) and calls `evaluate_config` /
+`evaluate_directory` with what it received.
 
 ## hyperpace-store
 
@@ -203,7 +227,16 @@ Tauri commands (all async, all returning `Result<T, String>` rendered for the UI
 `list_devices`, `connect`, `disconnect`, `device_state`, `read_settings`, `write_setting`,
 `set_button`, `save_macro`, `list_macros`, `delete_macro`, `set_profile`, `factory_reset`,
 `pair_receiver`, `receiver_light`, `export_config`, `import_config`, `firmware_list`,
-`firmware_import`, `firmware_install`, `firmware_check_for_updates`, `app_settings`.
+`firmware_import`, `firmware_install`, `firmware_check_for_updates`, `firmware_watch_check`,
+`app_settings`.
+
+`firmware_check_for_updates` compares the local archive against the connected device only; it is
+not an acquisition route. `firmware_watch_check` is route 1 ("watch for publication"): it fetches
+the vendor's own config files and firmware directory paths (`commands::firmware_watch`, pure
+evaluation in `hyperpace_firmware::watch`) and returns a `FirmwareWatchReportDto`, gated by the
+`firmware_watch_enabled` app setting (absent means enabled) and never downloading or installing
+anything. It also runs automatically, at most once per app start plus a slow (24 hour) periodic
+check in the background (`commands::firmware_watch::spawn_periodic_check`), never a busy loop.
 
 Events to the UI go over one `Channel<DeviceEventPayload>` per window, re-subscribed when a
 destroyed window is recreated. `device_state` is the subscribe command: its `channel` argument
@@ -240,6 +273,12 @@ honesty fence, `CLAUDE.md` section 8). `write_setting` gains five matching varia
 plain scalar writes), `dpiIndicatorOn` (`{key, on}`), and `longRange` (`{key, on}`, routed through
 `DeviceHandle::request(request::set_long_range(..))`, not `write_scalar`, since it addresses no
 flash offset).
+
+`FirmwareWatchReportDto` (`firmware_watch_check`'s return) flattens `hyperpace_firmware::watch`'s
+`ConfigFinding`/`DirectoryFinding` into plain structs carrying a pre-rendered `summary` (that
+type's own `Display`, disclaimer included), so the UI never reconstructs the wording itself; a
+`FirmwareWatchDirectoryDto` drops `DirectoryState`'s detail down to a `notable: bool` plus the same
+`summary` text, rather than mirroring that enum tag-for-tag on the wire.
 
 ## UI
 

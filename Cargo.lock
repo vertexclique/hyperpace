@@ -3268,6 +3268,8 @@ dependencies = [
  "hyperpace-firmware",
  "hyperpace-protocol",
  "hyperpace-store",
+ "reqwest 0.13.5",
+ "rustls",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -3293,6 +3295,7 @@ name = "hyperpace-firmware"
 version = "0.1.0"
 dependencies = [
  "hyperpace-protocol",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -6204,6 +6207,7 @@ checksum = "16a1cfa75cc186dd73d5818e510e042e40927bccc9c236b061cea97e1eb08029"
 dependencies = [
  "base64 0.23.1",
  "bytes",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "http",

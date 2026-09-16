@@ -194,6 +194,18 @@ starting each.
 | Phase 8 (packaging) | done as configuration | dist/deb, rpm, appimage, arch, windows, macos plus the udev rule and README; no package has been built or installed |
 | Gate | green | fmt, clippy with warnings as errors, doc build, 255 tests, cargo-deny advisories, bans, licenses and sources |
 
+Known gaps still open, recorded so none is dropped silently:
+
+| Gap | Why it matters | State |
+|---|---|---|
+| Keystroke chord editing on the Buttons screen | A button can be bound to a keystroke, but its content cannot be edited: the contract has no command to read or write the keystroke slot | to do |
+| Pairing progress and profile read-back | Pairing and profile changes are fire and forget; the interface shows the request, not the device's answer, because there is no get command or event for either | to do |
+| Structured logging | The doctrine requires structured logs with a counter per error path; today a few background failures (tray update, notification, window show) print to stderr | to do |
+| Simulator fidelity for pairing, factory reset and receiver light | The simulator acknowledges these with a bare success and models no state, so tests cannot prove the flows behave | to do |
+| Device layer on real hardware | Compile-checked and simulator-tested only; never opened against a device | blocked by the operator's rule, by design |
+| macOS and Windows paths | Implemented per documentation, never executed on those systems | needs those machines |
+| Built packages | Packaging configuration exists under `dist/`; no package has been built or installed | to do |
+
 Deferred, with reasons:
 
 - **Firmware images and rollback capability.** No genuine package exists; acquisition is a

@@ -98,6 +98,22 @@ accepts a package whose identity markers match this hardware); until one of
 them produces a real image, install and rollback stay built but unusable,
 and the archive stays empty.
 
+### Asking the vendor
+
+`docs/firmware-request.md` has a ready-to-send message for the vendor's
+support channel, asking for the mouse and receiver firmware packages (every
+version, not only the latest) for this exact hardware, and explains why a
+raw payload or a rebuilt image will not work. The Firmware screen has a
+copyable version of the same message. This is the only route that can
+plausibly return the version history rollback needs.
+
+The watcher (the second route) checks the vendor's own configuration files
+and firmware directory paths for a change and reports what it finds; it
+never downloads or installs anything on its own, and a changed file is
+evidence to look at, not proof that firmware is available. It runs once at
+app start plus a slow periodic check in the background, and can be turned
+off in app preferences.
+
 ## Development
 
 ```sh

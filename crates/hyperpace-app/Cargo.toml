@@ -38,6 +38,14 @@ serde_json = "1"
 # Only used to name the local firmware archive's files by content hash (`hyperpace-store`'s
 # `FirmwareRecord::sha256`); not used for anything security-sensitive.
 sha2 = "0.10"
+# Firmware watch route (docs/plans/hyperpace.md's firmware paragraph): fetches the vendor's own
+# config files and firmware directory paths, nothing else, never a firmware image. `reqwest`'s own
+# default TLS feature ("rustls") pulls in an aws-lc-sys/cmake native build step nothing else in
+# this workspace needs; "rustls-no-provider" skips that and this crate installs the `ring` crypto
+# provider itself at startup instead (see `run`), matching the dependency policy's no-new-heavy-
+# dependency-without-review rule (docs/decs/hyperpace_DECS.md).
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider", "blocking"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 
 [lints]
 workspace = true

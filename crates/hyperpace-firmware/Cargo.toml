@@ -9,6 +9,10 @@ repository.workspace = true
 
 [dependencies]
 hyperpace-protocol = { path = "../hyperpace-protocol", version = "0.1.0" }
+# Only used by `watch` to fingerprint vendor-fetched bytes against the sha256 values recorded in
+# `docs/papers/hyperpace-firmware-platform/FIRMWARE-VERDICT.md`; already a workspace dependency
+# (`hyperpace-protocol`, `hyperpace-app`), not a new one.
+sha2 = "0.10"
 
 [lints]
 workspace = true

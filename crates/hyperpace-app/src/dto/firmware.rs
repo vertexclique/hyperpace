@@ -1,6 +1,6 @@
-//! Firmware archive and flash progress shapes.
+//! Firmware archive, flash progress and watch-report shapes.
 
-use hyperpace_firmware::Progress;
+use hyperpace_firmware::{EVIDENCE_DISCLAIMER, Progress, WatchReport};
 use hyperpace_store::FirmwareRecord;
 use serde::{Deserialize, Serialize};
 
@@ -65,6 +65,117 @@ impl From<Progress> for FirmwareProgressPayload {
             bytes_sent: progress.bytes_sent,
             image_len: progress.image_len,
             percent: progress.percent,
+        }
+    }
+}
+
+/// One [`hyperpace_firmware::ConfigFinding`], flattened for the wire: `summary` is that type's own
+/// `Display`, so the UI never has to reconstruct the wording (and the honesty disclaimer inside
+/// it) itself.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FirmwareWatchConfigDto {
+    /// URL this finding is for.
+    pub url: String,
+    /// What this file is.
+    pub description: String,
+    /// Whether the fetched content's sha256 differs from the value recorded in the research.
+    pub changed: bool,
+    /// Quoted snippets around an `"upgrade"` key or a `.bin` reference, only populated when
+    /// `changed` is true.
+    pub evidence: Vec<String>,
+    /// Human-readable summary of this finding, including the evidence disclaimer when relevant.
+    pub summary: String,
+}
+
+/// One [`hyperpace_firmware::DirectoryFinding`], flattened the same way.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FirmwareWatchDirectoryDto {
+    /// URL this finding is for.
+    pub url: String,
+    /// What this path is.
+    pub description: String,
+    /// Whether this finding is worth a human's attention.
+    pub notable: bool,
+    /// Human-readable summary of this finding.
+    pub summary: String,
+}
+
+/// One target the watch route could not fetch at all.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FirmwareWatchFetchErrorDto {
+    /// URL that could not be fetched.
+    pub url: String,
+    /// Plain-English reason.
+    pub reason: String,
+}
+
+/// A full watch check, mirroring [`WatchReport`]. Carries [`EVIDENCE_DISCLAIMER`] verbatim so the
+/// UI never has to hardcode its own copy of the honesty fence's wording (`docs/plans/hyperpace.md`:
+/// "never claiming firmware is available" for a mere hash change).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FirmwareWatchReportDto {
+    /// One entry per configuration file the watch route checks.
+    pub configs: Vec<FirmwareWatchConfigDto>,
+    /// One entry per firmware directory path the watch route probes.
+    pub directories: Vec<FirmwareWatchDirectoryDto>,
+    /// One entry per target that could not be fetched at all.
+    pub fetch_errors: Vec<FirmwareWatchFetchErrorDto>,
+    /// Whether anything here is worth a human's attention.
+    pub has_findings: bool,
+    /// What every finding means and does not mean, verbatim, for direct display.
+    pub disclaimer: String,
+    /// Unix seconds when this check ran.
+    pub checked_at: i64,
+}
+
+impl FirmwareWatchReportDto {
+    /// Build the wire shape from a freshly evaluated [`WatchReport`] and the time it ran.
+    #[must_use]
+    pub fn from_report(report: WatchReport, checked_at: i64) -> Self {
+        let has_findings = report.has_findings();
+        let configs = report
+            .configs
+            .into_iter()
+            .map(|finding| {
+                let summary = finding.to_string();
+                FirmwareWatchConfigDto {
+                    url: finding.url.to_owned(),
+                    description: finding.description.to_owned(),
+                    changed: finding.changed,
+                    evidence: finding.evidence,
+                    summary,
+                }
+            })
+            .collect();
+        let directories = report
+            .directories
+            .into_iter()
+            .map(|finding| {
+                let summary = finding.to_string();
+                FirmwareWatchDirectoryDto {
+                    url: finding.url.to_owned(),
+                    description: finding.description.to_owned(),
+                    notable: finding.is_notable(),
+                    summary,
+                }
+            })
+            .collect();
+        let fetch_errors = report
+            .fetch_errors
+            .into_iter()
+            .map(|(url, reason)| FirmwareWatchFetchErrorDto { url, reason })
+            .collect();
+        Self {
+            configs,
+            directories,
+            fetch_errors,
+            has_findings,
+            disclaimer: EVIDENCE_DISCLAIMER.to_owned(),
+            checked_at,
         }
     }
 }

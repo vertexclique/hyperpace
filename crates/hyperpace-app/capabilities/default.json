@@ -24,6 +24,7 @@
     "allow-firmware-import",
     "allow-firmware-install",
     "allow-firmware-check-for-updates",
+    "allow-firmware-watch-check",
     "allow-app-settings"
   ]
 }

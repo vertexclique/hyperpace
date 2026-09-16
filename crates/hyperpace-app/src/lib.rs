@@ -47,6 +47,13 @@ use state::AppState;
 /// failing to initialize). The caller (`main.rs`) decides how to report that; this function never
 /// panics on it.
 pub fn run() -> Result<(), AppError> {
+    // `commands::firmware_watch`'s HTTP client depends on reqwest's "rustls-no-provider" feature
+    // (its own default feature pulls in an aws-lc-sys native build step nothing else in this
+    // workspace needs), which requires the app to install a process-wide default crypto provider
+    // itself, once, before the first TLS connection. A second install attempt returns `Err` and is
+    // safe to ignore; nothing else in this process installs one.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     let store_root = Store::default_root()?;
     let store = Store::open(&store_root)?;
 
@@ -87,6 +94,7 @@ pub fn run() -> Result<(), AppError> {
             commands::firmware::firmware_import,
             commands::firmware::firmware_install,
             commands::firmware::firmware_check_for_updates,
+            commands::firmware_watch::firmware_watch_check,
             commands::settings::app_settings,
         ])
         .setup(move |app| {
@@ -94,6 +102,7 @@ pub fn run() -> Result<(), AppError> {
             app.manage(AppState::new(store, store_root, handle.clone()));
             tray::build(&handle)?;
             window::show_main_window(&handle)?;
+            commands::firmware_watch::spawn_periodic_check(handle);
             Ok(())
         })
         .build(tauri::generate_context!())?;

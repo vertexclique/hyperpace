@@ -28,6 +28,7 @@ export const COMMAND_NAMES = [
 	'firmware_import',
 	'firmware_install',
 	'firmware_check_for_updates',
+	'firmware_watch_check',
 	'app_settings'
 ] as const;
 

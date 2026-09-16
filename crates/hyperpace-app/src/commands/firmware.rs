@@ -288,7 +288,10 @@ fn hex_sha256(bytes: &[u8]) -> String {
 }
 
 /// Unix seconds, clamped to 0 rather than panicking, for the rare host clock set before 1970.
-fn unix_now() -> i64 {
+///
+/// `pub(crate)` so `commands::firmware_watch` can stamp a watch report's `checkedAt` with the same
+/// clock read the archive import path uses, rather than a second copy of the same three lines.
+pub(crate) fn unix_now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |duration| {

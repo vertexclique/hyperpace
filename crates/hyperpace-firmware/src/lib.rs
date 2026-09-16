@@ -31,12 +31,15 @@
 //!   whether it targets this hardware.
 //! - [`mod@guards`]: the preflight checks a caller runs before ever flashing.
 //! - [`mod@flash`]: the state machine that streams a preflighted package.
+//! - [`mod@watch`]: pure evaluation for the "watch for publication" acquisition route; never
+//!   fetches a URL itself.
 
 pub mod error;
 pub mod flash;
 pub mod guards;
 pub mod header;
 pub mod package;
+pub mod watch;
 
 #[cfg(test)]
 mod test_support;
@@ -48,4 +51,9 @@ pub use header::{DeviceType, ImageHeader, UsbEndpoint};
 pub use package::{
     Match, Package, RECEIVER_PRODUCT_ID, UsbIds, VENDOR_ID, WIRED_PRODUCT_ID,
     order_for_multi_target,
+};
+pub use watch::{
+    CONFIG_TARGETS, ConfigFinding, ConfigTarget, DIRECTORY_TARGETS, DirectoryFinding,
+    DirectoryState, DirectoryTarget, EVIDENCE_DISCLAIMER, RECORDED_SPA_INDEX_SHA256, WatchReport,
+    evaluate_config, evaluate_directory,
 };

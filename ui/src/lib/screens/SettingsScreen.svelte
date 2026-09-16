@@ -219,6 +219,15 @@
 						appDirty = true;
 					}}
 				/>
+				<Toggle
+					label="Watch for firmware publication"
+					hint="Checks the vendor's own config files and firmware directory paths at app start and periodically; never downloads or installs anything."
+					checked={appDraft.firmwareWatchEnabled}
+					onchange={(v) => {
+						if (appDraft) appDraft.firmwareWatchEnabled = v;
+						appDirty = true;
+					}}
+				/>
 				<RangeField
 					label="Low battery warning"
 					unit="%"
