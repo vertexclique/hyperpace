@@ -43,7 +43,7 @@
 <div class="field">
 	<div class="field-row">
 		<label class="field-label" for={uid}>{label}</label>
-		<span class="range-value">{unknown ? '-' : `${value}${unit}`}</span>
+		<span class="range-value mono">{unknown ? '-' : `${value}${unit}`}</span>
 	</div>
 	{#if hint}<div class="field-hint">{hint}</div>{/if}
 	<input
@@ -60,14 +60,51 @@
 
 <style>
 	.range-value {
-		font-size: 12px;
-		color: var(--text-muted);
-		font-variant-numeric: tabular-nums;
+		font-size: var(--text-xs);
+		color: var(--color-muted);
 	}
 
+	/* accent-color's themed thumb is round in every engine, and zeroing a radius property to
+	   cancel that is exactly what the hard rule forbids (design.md "Shape: nothing is round"
+	   says delete the declaration, never write a zero one). A fully custom track and thumb
+	   sidesteps the theming instead: appearance: none draws a plain box with no radius of its
+	   own, so it is square because nothing ever asks it to be round. */
 	input[type='range'] {
 		width: 100%;
-		accent-color: var(--accent);
+		appearance: none;
 		background: transparent;
+	}
+
+	input[type='range']::-webkit-slider-runnable-track {
+		height: 3px;
+		background: var(--color-rule);
+	}
+
+	input[type='range']::-webkit-slider-thumb {
+		appearance: none;
+		width: 12px;
+		height: 12px;
+		margin-top: -4.5px;
+		background: var(--color-accent);
+	}
+
+	input[type='range']:disabled::-webkit-slider-thumb {
+		background: var(--color-faint);
+	}
+
+	input[type='range']::-moz-range-track {
+		height: 3px;
+		background: var(--color-rule);
+	}
+
+	input[type='range']::-moz-range-thumb {
+		width: 12px;
+		height: 12px;
+		background: var(--color-accent);
+		border: none;
+	}
+
+	input[type='range']:disabled::-moz-range-thumb {
+		background: var(--color-faint);
 	}
 </style>

@@ -1,4 +1,7 @@
 <script lang="ts">
+	import BatteryIndicator from './BatteryIndicator.svelte';
+	import ConnectionBadge from './ConnectionBadge.svelte';
+
 	interface Props {
 		title: string;
 		subtitle?: string;
@@ -8,23 +11,57 @@
 </script>
 
 <header class="top-bar">
-	<h1>{title}</h1>
-	{#if subtitle}<p class="subtitle">{subtitle}</p>{/if}
+	<div class="titles">
+		<h1>{title}</h1>
+		{#if subtitle}<p class="subtitle">{subtitle}</p>{/if}
+	</div>
+
+	<!-- The window's one device readout. The tray carries the same facts for when the window is
+	     closed; both read them from the same connection state, never from a default. -->
+	<div class="device" aria-live="polite">
+		<ConnectionBadge />
+		<BatteryIndicator />
+	</div>
 </header>
 
 <style>
 	.top-bar {
-		padding: 26px 32px 6px;
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: var(--space-md);
+		padding: var(--space-lg) var(--space-xl) var(--space-2xs);
 	}
 
+	/* font-family/weight/tracking come from app.css's global h1 rule (design.md Typography:
+	   Space Grotesk 600 for screen titles); only the size is set here. */
 	h1 {
-		font-size: 19px;
-		font-weight: 650;
+		font-size: var(--text-display);
 	}
 
 	.subtitle {
-		margin-top: 4px;
-		font-size: 12.5px;
-		color: var(--text-muted);
+		margin-top: var(--space-3xs);
+		font-size: var(--text-sm);
+		color: var(--color-muted);
+	}
+
+	.device {
+		display: flex;
+		align-items: center;
+		gap: var(--space-sm);
+		flex-shrink: 0;
+		/* Sits on the display line's optical centre rather than its box top. */
+		padding-top: var(--space-3xs);
+	}
+
+	@media (max-width: 900px) {
+		.top-bar {
+			flex-direction: column;
+			gap: var(--space-2xs);
+		}
+
+		.device {
+			padding-top: 0;
+		}
 	}
 </style>

@@ -9,7 +9,7 @@
 	import FirmwareScreen from '$lib/screens/FirmwareScreen.svelte';
 	import SettingsScreen from '$lib/screens/SettingsScreen.svelte';
 
-	let active = $state<ScreenId>('buttons');
+	let active = $state<ScreenId>('performance');
 
 	const titles: Record<ScreenId, { title: string; subtitle: string }> = {
 		buttons: { title: 'Buttons', subtitle: 'Assign an action to each button.' },

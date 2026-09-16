@@ -38,6 +38,11 @@
 <div class="field">
 	{#if label}<span class="field-label">{label}</span>{/if}
 	<div class="swatch-row">
+		<!-- The colour is always a value this app knows (a device reading or the draft in hand),
+		     never one of the vendor's 14 preset preview bitmaps (ui/static/device/colors/): those
+		     are flat swatches of the same RGB this control already holds, so the swatch is drawn
+		     from the value itself instead of an extra image request. -->
+		<span class="swatch" class:unknown style:background={unknown ? null : toHex(color)}></span>
 		<input
 			type="color"
 			disabled={disabled || unknown}
@@ -45,7 +50,7 @@
 			oninput={handleInput}
 			aria-label={label ?? 'Color'}
 		/>
-		<span class="field-hint">{unknown ? '-' : toHex(color)}</span>
+		<span class="field-hint mono">{unknown ? '-' : toHex(color)}</span>
 	</div>
 </div>
 
@@ -53,15 +58,28 @@
 	.swatch-row {
 		display: flex;
 		align-items: center;
-		gap: 10px;
+		gap: var(--space-2xs);
+	}
+
+	/* Cut at --cut-chip, same as every other swatch, tag and badge (design.md "Shape"). */
+	.swatch {
+		width: 18px;
+		height: 18px;
+		flex-shrink: 0;
+		border: 1px solid var(--color-rule);
+		clip-path: polygon(0 0, calc(100% - var(--cut-chip)) 0, 100% var(--cut-chip), 100% 100%, 0 100%);
+	}
+
+	/* No reading yet: a plain neutral fill stands in for the colour, never a guessed one. */
+	.swatch.unknown {
+		background: var(--color-paper-3);
 	}
 
 	input[type='color'] {
 		width: 34px;
 		height: 26px;
 		padding: 0;
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
+		border: 1px solid var(--color-rule);
 		background: transparent;
 	}
 </style>

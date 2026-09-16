@@ -25,7 +25,7 @@
 
 	function selectMacro(macro: SaveMacroRequest & { id: string }) {
 		selectedId = macro.id;
-		draft = structuredClone(macro);
+		draft = $state.snapshot(macro);
 		confirmingDelete = false;
 	}
 
@@ -83,9 +83,14 @@
 </script>
 
 <div class="layout">
-	<aside class="panel list-panel">
-		<div class="panel-title">Macro library</div>
-		<div class="panel-subtitle">Stored locally, bound to buttons from the Buttons screen.</div>
+	<aside class="plate list-plate">
+		<div class="plate-head">
+			<div class="plate-title-group">
+				<span class="plate-stub"></span>
+				<span class="plate-title">Macro library</span>
+			</div>
+		</div>
+		<p class="field-hint plate-subtitle">Stored locally, bound to buttons from the Buttons screen.</p>
 		<button class="btn btn-primary new-btn" onclick={newMacro}>New macro</button>
 		{#if device.macrosLoading}
 			<p class="field-hint">Loading...</p>
@@ -94,15 +99,16 @@
 		{:else}
 			<ul class="macro-list">
 				{#each device.macros as macro (macro.id)}
+					{@const active = selectedId === macro.id}
 					<li>
-						<button
-							type="button"
-							class="list-row"
-							class:active={selectedId === macro.id}
-							onclick={() => selectMacro(macro)}
-						>
-							<span>{macro.name || (macro.slot !== undefined ? `Slot ${macro.slot}` : 'Untitled')}</span>
-							<span class="field-hint">{macro.events.length} events</span>
+						<button type="button" class="list-row" class:active onclick={() => selectMacro(macro)}>
+							{#if active}<span class="plate-stub row-stub"></span>{/if}
+							<span class="row-text">
+								<span class="row-label"
+									>{macro.name || (macro.slot !== undefined ? `Slot ${macro.slot}` : 'Untitled')}</span
+								>
+								<span class="field-hint mono">{macro.events.length} events</span>
+							</span>
 						</button>
 					</li>
 				{/each}
@@ -112,36 +118,37 @@
 
 	<section class="editor-column">
 		{#if !draft}
-			<EmptyState
-				title="No macro selected"
-				message="Pick a macro from the library or create a new one to start editing."
-			/>
+			<div class="plate editor-plate empty-plate">
+				<EmptyState
+					title="No macro selected"
+					message="Pick a macro from the library or create a new one to start editing."
+				/>
+			</div>
 		{:else}
-			<div class="panel">
+			<div class="plate editor-plate">
 				<div class="field-row">
-					<div class="field" style="flex:1">
+					<div class="field name-field">
 						<label class="field-label" for="macro-name">Name</label>
 						<input id="macro-name" class="text-input" bind:value={draft.name} />
-						<span class="field-hint" class:error-text={nameTooLong}>
+						<span class="field-hint mono" class:error-text={nameTooLong}>
 							{nameBytes}/{MACRO_NAME_MAX_BYTES} bytes
 						</span>
 					</div>
 					<div class="field">
 						<span class="field-label">Slot</span>
 						<input
-							class="text-input"
+							class="text-input mono slot-input"
 							type="number"
 							min="0"
 							max="63"
-							style="width:80px"
 							bind:value={draft.slot}
 						/>
 					</div>
 				</div>
 
-				<div class="events-header">
-					<span class="panel-title" style="margin:0">Events</span>
-					<span class="field-hint">{draft.events.length}/{MACRO_EVENT_MAX_COUNT}</span>
+				<div class="plate-head events-head">
+					<span class="plate-title">Events</span>
+					<span class="field-hint mono">{draft.events.length}/{MACRO_EVENT_MAX_COUNT}</span>
 				</div>
 
 				{#if draft.events.length === 0}
@@ -158,7 +165,7 @@
 						</div>
 						{#each draft.events as ev, i (i)}
 							<div class="event-row">
-								<span class="field-hint event-index">{i + 1}</span>
+								<span class="field-hint mono event-index">{i + 1}</span>
 								<SelectField
 									label={`Event ${i + 1} press or release`}
 									hideLabel
@@ -176,9 +183,15 @@
 									options={EVENT_KINDS}
 									onchange={(v) => (ev.kind = v)}
 								/>
-								<input class="text-input" type="number" min="0" max="65535" bind:value={ev.value} />
 								<input
-									class="text-input"
+									class="text-input mono"
+									type="number"
+									min="0"
+									max="65535"
+									bind:value={ev.value}
+								/>
+								<input
+									class="text-input mono"
 									type="number"
 									min="0"
 									max="65535"
@@ -198,7 +211,11 @@
 					</div>
 				{/if}
 
-				<button class="btn" disabled={draft.events.length >= MACRO_EVENT_MAX_COUNT} onclick={addEvent}>
+				<button
+					class="btn add-event-btn"
+					disabled={draft.events.length >= MACRO_EVENT_MAX_COUNT}
+					onclick={addEvent}
+				>
 					Add event
 				</button>
 
@@ -224,20 +241,38 @@
 <style>
 	.layout {
 		display: flex;
-		gap: 20px;
-		padding: 0 32px 32px;
+		gap: var(--space-md);
+		padding: 0 var(--space-lg) var(--space-lg);
 		align-items: flex-start;
 	}
 
-	.list-panel {
-		width: 260px;
+	.list-plate {
+		width: 300px;
 		flex-shrink: 0;
 	}
 
+	/* Groups the active-panel stub with its title so `.plate-head`'s own space-between keeps
+	   them together at the head's leading edge (design.md "A panel header is a strip above a
+	   hairline. The active panel carries a 2px accent stub..."). */
+	.plate-title-group {
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-2xs);
+	}
+
+	.plate-title {
+		font-family: var(--font-display);
+		font-size: var(--text-md);
+		font-weight: 600;
+		color: var(--color-ink);
+	}
+
+	.plate-subtitle {
+		margin-bottom: var(--space-sm);
+	}
+
 	.new-btn {
-		width: 100%;
-		justify-content: center;
-		margin: 10px 0 14px;
+		margin: var(--space-sm) 0 var(--space-md);
 	}
 
 	.macro-list {
@@ -246,47 +281,93 @@
 		padding: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 6px;
+		/* Bounds the library to its own scroll region instead of growing the screen past the
+		   window: the store can hold more macros than fit at once, so this list scrolls, the
+		   page never does. */
+		max-height: 480px;
+		overflow-y: auto;
+	}
+
+	.macro-list > li + li {
+		border-top: 1px solid var(--color-rule);
 	}
 
 	.list-row {
 		width: 100%;
 		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 2px;
-		background: var(--bg-raised);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		padding: 8px 10px;
+		align-items: center;
+		gap: var(--space-2xs);
+		background: transparent;
+		border: none;
+		padding: var(--space-xs) var(--space-2xs);
 		text-align: left;
-		font-size: 12.5px;
+		font-size: var(--text-sm);
+	}
+
+	.list-row:hover {
+		background: var(--color-paper-3);
 	}
 
 	.list-row.active {
-		border-color: var(--accent);
+		background: var(--color-paper-3);
+	}
+
+	.row-stub {
+		margin-right: 2px;
+	}
+
+	.row-text {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 2px;
+		min-width: 0;
+	}
+
+	.row-label {
+		font-weight: 500;
+		color: var(--color-ink);
 	}
 
 	.editor-column {
 		flex: 1;
-		min-width: 0;
+		min-width: 420px;
 	}
 
-	.events-header {
+	/* Framed like every other panel instead of a bare dashed rectangle floating on the paper
+	   ground (the nested dashed box is EmptyState's own, same as Firmware and Settings use it
+	   inside a plate). Bounded rather than stretched to the column's full width: a short message
+	   filling the whole remaining width would read as emptier, not less empty. */
+	.empty-plate {
 		display: flex;
-		justify-content: space-between;
-		align-items: baseline;
-		margin: 18px 0 10px;
+		align-items: center;
+		justify-content: center;
+		max-width: 560px;
+		min-height: 300px;
+	}
+
+	.name-field {
+		flex: 1;
+	}
+
+	.slot-input {
+		width: 80px;
+	}
+
+	.events-head {
+		margin-top: var(--space-md);
 	}
 
 	.event-table {
 		display: flex;
 		flex-direction: column;
-		gap: 6px;
-		margin-bottom: 12px;
-		/* A safety net, not the primary fix (that is `.layout` stacking below): this table's
-		   columns have a real minimum width, so if it is ever squeezed narrower than that, it
-		   scrolls within its own box instead of forcing the whole page to scroll sideways. */
+		margin-bottom: var(--space-sm);
+		/* A macro can hold up to 70 events: bound the visible list to its own scroll region
+		   (contained scroll) rather than letting the screen grow past the window, matching the
+		   same "the page never scrolls, a bounded sub-list does" rule as the library above. The
+		   horizontal scroll is a second, independent safety net for a squeezed width. */
+		max-height: 360px;
+		overflow-y: auto;
 		overflow-x: auto;
 	}
 
@@ -294,16 +375,24 @@
 	.event-row {
 		display: grid;
 		grid-template-columns: 22px 110px 130px 90px 90px 1fr;
-		gap: 8px;
+		gap: var(--space-2xs);
 		align-items: center;
 		min-width: 560px;
+		padding: var(--space-3xs) 0;
+	}
+
+	/* Square rows separated by hairlines, not individually boxed (design.md: depth comes from
+	   the paper steps and the hairlines, never a border-per-row). */
+	.event-row {
+		border-top: 1px solid var(--color-rule);
 	}
 
 	.event-head {
-		font-size: 11px;
-		color: var(--text-faint);
+		font-size: var(--text-xs);
+		color: var(--color-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.03em;
+		padding-bottom: var(--space-2xs);
 	}
 
 	.event-index {
@@ -312,29 +401,33 @@
 
 	.event-actions {
 		display: flex;
-		gap: 4px;
+		gap: var(--space-3xs);
 		justify-self: end;
+	}
+
+	.add-event-btn {
+		margin-top: var(--space-2xs);
 	}
 
 	.actions-row {
 		display: flex;
-		gap: 8px;
-		margin-top: 18px;
+		gap: var(--space-2xs);
+		margin-top: var(--space-md);
 		align-items: center;
 	}
 
 	.error-text {
-		color: var(--danger);
+		color: var(--color-danger);
 	}
 
-	/* Same breakpoint as the Buttons screen (see its own comment): the library list stacks above
-	   the editor instead of squeezing beside it. */
+	/* Same breakpoint as the Buttons screen: the library list stacks above the editor instead of
+	   squeezing beside it. */
 	@media (max-width: 900px) {
 		.layout {
 			flex-direction: column;
 		}
 
-		.list-panel {
+		.list-plate {
 			width: 100%;
 		}
 	}

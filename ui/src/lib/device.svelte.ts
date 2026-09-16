@@ -133,6 +133,20 @@ export function diffSettings(before: Settings, after: Settings): WriteSettingReq
 	return requests;
 }
 
+/**
+ * Label for an "apply changes" button given whether a real reading exists (`hasData`), whether
+ * the draft differs from it (`dirty`), and whether a write is in flight (`saving`). Never returns
+ * "Up to date" when there is no device to be up to date with: that reads as a claim about the
+ * device's state, and with no device connected nothing is actually known (see
+ * docs/decs/hyperpace_DECS.md, the "Up to date" honesty-fence fix). One function so the Performance
+ * and Lighting screens' apply buttons cannot drift on this rule.
+ */
+export function applyButtonLabel(hasData: boolean, dirty: boolean, saving: boolean): string {
+	if (saving) return 'Applying...';
+	if (!hasData) return 'Apply changes';
+	return dirty ? 'Apply changes' : 'Up to date';
+}
+
 class DeviceStore {
 	devices = $state<DeviceDescriptor[]>([]);
 	scanning = $state(false);
@@ -148,6 +162,8 @@ class DeviceStore {
 
 	settings = $state<Settings | null>(null);
 	settingsLoading = $state(false);
+	/** Another settings read is owed once the one in flight finishes; see `refreshSettings`. */
+	private settingsRefreshQueued = false;
 
 	macros = $state<MacroRecord[]>([]);
 	macrosLoading = $state(false);
@@ -173,10 +189,25 @@ class DeviceStore {
 	private channel: ReturnType<typeof openDeviceEventChannel> | null = null;
 	private initialized = false;
 
+	/** What `lastError` was reporting on, so a later success of the same operation can clear it. */
+	private lastErrorContext: string | null = null;
+
 	private fail(context: string, err: unknown): never {
 		const message = err instanceof Error ? err.message : String(err);
 		this.lastError = `${context}: ${message}`;
+		this.lastErrorContext = context;
 		throw err;
+	}
+
+	/**
+	 * Clear `lastError` if it reports a failure of `context`. Called when that same operation
+	 * later succeeds, so a failure that has since been recovered from stops being shown as though
+	 * it still applied. A failure of anything else stays up.
+	 */
+	private recovered(context: string) {
+		if (this.lastErrorContext !== context) return;
+		this.lastError = null;
+		this.lastErrorContext = null;
 	}
 
 	clearError() {
@@ -204,6 +235,12 @@ class DeviceStore {
 		try {
 			const state = await invoke<DeviceState>('device_state', { channel: this.channel });
 			this.applyDeviceState(state);
+			// The app connects to the mouse itself at startup, so a window opening afterwards can
+			// find a device already connected with nobody having called `connect` here. The identity
+			// is what says the connection is ready: it is only reported once the device has answered
+			// and its settings are readable. Before that, reading would fail with "no device is
+			// connected", and the `connected` event this window is now subscribed to will do the read.
+			if (state.connected && state.identity) this.refreshSettingsInBackground();
 		} catch (err) {
 			this.fail('Could not read device state', err);
 		}
@@ -251,15 +288,39 @@ class DeviceStore {
 		}
 	}
 
+	/**
+	 * Re-reads the whole settings shadow. Concurrency-safe: a call made while a read is already in
+	 * flight does not start a second one, it marks that another read is owed, so a push that
+	 * arrives mid-read is never lost and never turns into a burst of reads.
+	 */
 	async refreshSettings() {
+		if (this.settingsLoading) {
+			this.settingsRefreshQueued = true;
+			return;
+		}
 		this.settingsLoading = true;
 		try {
 			this.settings = await invoke<Settings>('read_settings');
+			this.recovered('Could not read settings');
 		} catch (err) {
 			this.fail('Could not read settings', err);
 		} finally {
 			this.settingsLoading = false;
+			if (this.settingsRefreshQueued) {
+				this.settingsRefreshQueued = false;
+				this.refreshSettingsInBackground();
+			}
 		}
+	}
+
+	/**
+	 * Starts a settings read that nothing is waiting on, for the paths that learn the device
+	 * became readable from an event rather than from their own call. `refreshSettings` reports its
+	 * own failure through `lastError` before it rethrows, so the rethrow has nowhere useful to go
+	 * here and is dropped rather than left as an unhandled rejection.
+	 */
+	private refreshSettingsInBackground() {
+		void this.refreshSettings().catch(() => {});
 	}
 
 	/** Sends one `write_setting` command per request, then reconciles from a fresh read. */
@@ -479,15 +540,25 @@ class DeviceStore {
 				this.identity = event.identity;
 				this.connected = true;
 				this.online = true;
+				// This is the only signal a connection the app made on its own (at startup, or
+				// when the receiver was plugged back in) produces, so it is where those
+				// connections learn their settings are now readable.
+				this.refreshSettingsInBackground();
 				return;
 			case 'battery':
 				this.battery = event.battery;
 				return;
-			case 'changed':
-				// A settings-affecting push arrived; re-read the shadow rather than
-				// guess which fields moved.
-				void this.refreshSettings();
+			case 'changed': {
+				// The mouse changed a setting itself (a DPI button press, a profile switch): re-read
+				// rather than guess which fields moved. The device layer re-reads its own copy before
+				// answering, so this shows what the mouse holds now. A battery-only push changes no
+				// setting and is left to the battery poll.
+				const { dpi, polling, profile, dpiIndicator, lighting } = event.changed;
+				if (dpi || polling || profile || dpiIndicator || lighting) {
+					this.refreshSettingsInBackground();
+				}
 				return;
+			}
 		}
 	}
 }

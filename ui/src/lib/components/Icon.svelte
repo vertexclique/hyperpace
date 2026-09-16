@@ -33,15 +33,15 @@
 		<path d="M12 15l4.2-5.2" />
 		<circle cx="12" cy="15" r="1.1" fill="currentColor" stroke="none" />
 	{:else if name === 'macros'}
-		<rect x="4" y="4" width="16" height="4.5" rx="1" />
-		<rect x="4" y="10.5" width="16" height="4.5" rx="1" />
-		<rect x="4" y="17" width="10" height="4.5" rx="1" />
+		<rect x="4" y="4" width="16" height="4.5" />
+		<rect x="4" y="10.5" width="16" height="4.5" />
+		<rect x="4" y="17" width="10" height="4.5" />
 	{:else if name === 'lighting'}
 		<path d="M9 18h6" />
 		<path d="M10 21h4" />
 		<path d="M12 3a6 6 0 0 0-3.4 10.9c.6.45.9 1.15.9 1.9V16h5v-.2c0-.75.3-1.45.9-1.9A6 6 0 0 0 12 3Z" />
 	{:else if name === 'firmware'}
-		<rect x="7" y="7" width="10" height="10" rx="1.4" />
+		<rect x="7" y="7" width="10" height="10" />
 		<path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
 		<path d="M5 5l2 2M19 5l-2 2M5 19l2-2M19 19l-2-2" />
 	{:else if name === 'settings'}

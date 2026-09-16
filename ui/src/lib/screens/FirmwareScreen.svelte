@@ -1,37 +1,35 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { device } from '../device.svelte';
-
-	// Route 2 ("the vendor request"): the ready-to-send message, kept in sync by hand with
-	// docs/firmware-request.md (the same convention ui/src/lib/generated/commands.ts uses to stay
-	// in sync with command_list::COMMANDS). This is the short, copyable core of that document; the
-	// full document explains why each line is worded the way it is.
-	const VENDOR_REQUEST_MESSAGE = `Subject: Firmware update packages needed for HYPACE mouse and receiver (all versions)
-
-Hello,
-
-I own a Lofree HYPACE mouse and would like to request the official firmware update packages for it and its 2.4 GHz receiver, including every version you have available, not only the current one.
-
-My hardware identifies itself as:
-- Mouse, wired connection: USB vendor id 0x3554, product id 0xFB14 (reported device version 0x0300)
-- Receiver, 2.4 GHz dongle: USB vendor id 0x3554, product id 0xFB16 (reported device version 0x0216)
-- Device model id reported by your own driver: cid 102
-
-Could you send:
-1. Every firmware package you have for the mouse, every version, not only the latest.
-2. Every firmware package you have for the receiver, every version, for whichever receiver variant (1K, 2K, 4K or 8K) matches product id 0xFB16 on my unit. Could you also confirm which variant that is?
-3. Please send the complete, vendor-built update package exactly as your own updater tool would use it, not a raw firmware payload and not a rebuilt or re-packaged image. A raw payload or a rebuilt image cannot be flashed: the update procedure needs the whole package your build process produces, not just the firmware bytes inside it.
-
-Having more than one version lets me roll back if a newer release causes a problem, which is why I am asking for the full version history rather than only the newest release.
-
-Thank you for your help.`;
+	import EmptyState from '../components/EmptyState.svelte';
 
 	let checking = $state(false);
+	// Distinct from `checking`: whether a check has ever completed, so a screen freshly opened
+	// never claims "no newer package found" before it has actually looked (device.firmwareUpdates
+	// starts as [] regardless, which would otherwise read the same as a real zero-result check).
+	let checked = $state(false);
 	let importing = $state(false);
 	let installingId = $state<string | null>(null);
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let watching = $state(false);
-	let copied = $state(false);
+
+	const PROGRESS_SEGMENTS = 24;
+	const PROGRESS_SEGMENT_INDEXES = Array.from({ length: PROGRESS_SEGMENTS }, (_, i) => i);
+
+	// `commands/firmware.rs::firmware_install` refuses outright unless the connection has write
+	// access to a real device (it never even attempts the simulator, which never models the
+	// update bootloader). Gating the CTA on the same condition, rather than letting a doomed click
+	// surface only as a lastError after the fact, is what keeps this screen's one primary action
+	// honest about when it can actually run.
+	let installReady = $derived(
+		device.connected && device.backend === 'realDevice' && device.access === 'readWrite'
+	);
+
+	function installBlockedReason(): string {
+		if (!device.connected) return 'No mouse connected.';
+		if (device.backend === 'simulator') return 'The simulator cannot be flashed.';
+		return 'This connection is read-only; installing needs write access.';
+	}
 
 	onMount(() => {
 		void device.refreshFirmware();
@@ -41,6 +39,7 @@ Thank you for your help.`;
 		checking = true;
 		try {
 			await device.checkForFirmwareUpdates();
+			checked = true;
 		} finally {
 			checking = false;
 		}
@@ -52,18 +51,6 @@ Thank you for your help.`;
 			await device.checkFirmwarePublication();
 		} finally {
 			watching = false;
-		}
-	}
-
-	async function copyVendorRequest() {
-		try {
-			await navigator.clipboard.writeText(VENDOR_REQUEST_MESSAGE);
-			copied = true;
-			setTimeout(() => (copied = false), 2000);
-		} catch {
-			// Clipboard access can be refused (no permission, no secure context); the text is
-			// still on screen and selectable by hand, so this is not a failure worth surfacing
-			// through device.lastError, which is reserved for backend command failures.
 		}
 	}
 
@@ -96,186 +83,261 @@ Thank you for your help.`;
 </script>
 
 <div class="page-pad">
-	<section class="panel">
-		<div class="panel-title">Firmware archive</div>
-		<div class="panel-subtitle">Images this app has verified and can flash to a mouse or receiver.</div>
-
-		{#if device.firmwareLoading}
-			<p class="field-hint">Loading...</p>
-		{:else if device.firmware.length === 0}
-			<div class="empty-state firmware-empty">
-				<strong>No firmware available for this device yet</strong>
-				<p>
-					No genuine firmware package for this mouse has been located. Install and rollback are
-					built and ready, they simply have nothing in the archive to act on. Rollback needs at
-					least two vendor-built packages per target before it is even possible. Asking the
-					vendor or importing a package below are the ways to add one.
-				</p>
-				<div class="disabled-actions">
-					<button class="btn btn-primary" disabled>Install latest</button>
-					<button class="btn" disabled>Roll back</button>
-				</div>
+	<div class="grid firmware-grid">
+		<section class="plate">
+			<div class="plate-head">
+				<h2 class="plate-title">Firmware archive</h2>
+				<span class="chip chip-warning">Unverified on hardware</span>
 			</div>
-		{:else}
-			<ul class="firmware-list">
-				{#each device.firmware as fw (fw.id)}
-					<li class="firmware-row">
-						<div>
-							<div class="field-label">{fw.product} - v{fw.version}</div>
-							<div class="field-hint">
-								cid {fw.cid} mid {fw.mid}, imported {formatUnixSeconds(fw.importedAt)}
-							</div>
-						</div>
-						<button
-							class="btn btn-primary"
-							disabled={installingId !== null}
-							onclick={() => install(fw.id)}
-						>
-							{installingId === fw.id
-								? device.firmwareProgress
-									? `Installing... ${device.firmwareProgress.percent}%`
-									: 'Installing...'
-								: 'Install'}
+			<p class="plate-subtitle">
+				Packages already imported to this app and matched against this hardware's identity
+				markers.
+			</p>
+			<p class="field-hint caution">
+				Installing runs the researched update procedure end to end; it has never been exercised
+				against real hardware.
+			</p>
+
+			{#if device.firmwareLoading}
+				<p class="field-hint">Loading...</p>
+			{:else if device.firmware.length === 0}
+				<EmptyState
+					title="No firmware available for this device yet"
+					message="No genuine firmware package for this mouse has been located. Install and rollback are built and ready, they simply have nothing in the archive to act on. Rollback needs at least two vendor-built packages per target before it is even possible. Asking the vendor or importing a package below are the ways to add one."
+				>
+					{#snippet actions()}
+						<button class="btn btn-primary" disabled title="No package in the archive to install">
+							Install
 						</button>
-					</li>
-				{/each}
-			</ul>
-			<p class="field-hint">
-				Installing an older entry for the same component is how a rollback is performed; there
-				is no separate rollback command.
-			</p>
-		{/if}
-
-		<div class="divider"></div>
-
-		<div class="field-row">
-			<div>
-				<div class="field-label">Check for updates</div>
-				<div class="field-hint">
-					Compares the local archive above against what the connected device reports, for an
-					already-imported package newer than the installed version.
-				</div>
-			</div>
-			<button class="btn" disabled={checking} onclick={checkForUpdates}>
-				{checking ? 'Checking...' : 'Check for updates'}
-			</button>
-		</div>
-		{#if !checking && device.firmwareUpdates.length > 0}
-			<p class="field-hint">
-				{device.firmwareUpdates.length} update{device.firmwareUpdates.length === 1 ? '' : 's'} available
-				for the connected device.
-			</p>
-		{/if}
-
-		<div class="divider"></div>
-
-		<div class="panel-title">Ask the vendor</div>
-		<div class="panel-subtitle">
-			The route most likely to yield a real, rollback-capable version history. See
-			<code>docs/firmware-request.md</code> for the full explanation.
-		</div>
-		<pre class="vendor-request">{VENDOR_REQUEST_MESSAGE}</pre>
-		<button class="btn" onclick={copyVendorRequest}>
-			{copied ? 'Copied' : 'Copy request message'}
-		</button>
-
-		<div class="divider"></div>
-
-		<div class="field-row">
-			<div>
-				<div class="field-label">Watch for publication</div>
-				<div class="field-hint">
-					Checks the vendor's own configuration files and firmware directory paths for a change,
-					and reports what it finds. Never downloads or installs anything on its own; a changed
-					file is evidence to look at, not proof that firmware is available. Runs once at app
-					start plus a slow periodic check in the background; can be turned off in app
-					preferences.
-				</div>
-			</div>
-			<button class="btn" disabled={watching} onclick={checkPublication}>
-				{watching ? 'Checking...' : 'Check for publication'}
-			</button>
-		</div>
-		{#if device.firmwareWatchReport}
-			{@const report = device.firmwareWatchReport}
-			<div class="watch-report">
+						<button
+							class="btn"
+							disabled
+							title="Achieved by installing an older archived package for the same target, not a separate command; needs at least two archived packages, and none are present."
+						>
+							Roll back
+						</button>
+					{/snippet}
+				</EmptyState>
+			{:else}
+				{#if !installReady}
+					<p class="field-hint error-text">{installBlockedReason()}</p>
+				{/if}
+				<ul class="firmware-list">
+					{#each device.firmware as fw (fw.id)}
+						<li class="firmware-item">
+							<div class="firmware-row">
+								<div>
+									<div class="field-label">
+										{fw.product} - <span class="mono">v{fw.version}</span>
+									</div>
+									<div class="field-hint mono">cid {fw.cid}, mid {fw.mid}</div>
+									<div class="field-hint">imported {formatUnixSeconds(fw.importedAt)}</div>
+								</div>
+								<button
+									class="btn btn-primary"
+									disabled={installingId !== null || !installReady}
+									title={installReady ? undefined : installBlockedReason()}
+									onclick={() => install(fw.id)}
+								>
+									{installingId === fw.id ? 'Installing...' : 'Install'}
+								</button>
+							</div>
+							{#if installingId === fw.id && device.firmwareProgress}
+								{@const p = device.firmwareProgress}
+								<div
+									class="progress"
+									role="progressbar"
+									aria-valuenow={p.percent}
+									aria-valuemin={0}
+									aria-valuemax={100}
+									aria-label={`Installing ${fw.product}`}
+								>
+									<div class="progress-track">
+										{#each PROGRESS_SEGMENT_INDEXES as i (i)}
+											<span
+												class="progress-seg"
+												class:filled={i < Math.round((p.percent / 100) * PROGRESS_SEGMENTS)}
+											></span>
+										{/each}
+									</div>
+									<div class="progress-readout mono">
+										image {p.imageIndex + 1}/{p.imageCount}, {p.bytesSent}/{p.imageLen} B, {p.percent}%
+									</div>
+								</div>
+							{/if}
+						</li>
+					{/each}
+				</ul>
 				<p class="field-hint">
-					Checked {formatUnixSeconds(report.checkedAt)}.
-					{report.hasFindings
-						? 'Something changed since the research recorded it, listed below.'
-						: 'Nothing has changed since the research recorded it.'}
+					Installing an older entry for the same component is how a rollback is performed; there
+					is no separate rollback command.
 				</p>
-				{#each report.configs.filter((c) => c.changed) as finding (finding.url)}
-					<div class="watch-finding">
-						<div class="field-label">{finding.description}</div>
-						<p class="field-hint">{finding.summary}</p>
-						{#each finding.evidence as snippet (snippet)}
-							<code class="evidence-snippet">{snippet}</code>
+			{/if}
+
+			<div class="rule"></div>
+
+			<div class="field-row">
+				<div>
+					<div class="field-label">Check for updates</div>
+					<div class="field-hint">
+						Compares the local archive above against what the connected device reports, for an
+						already-imported package newer than the installed version.
+					</div>
+				</div>
+				<button
+					class="btn"
+					disabled={checking || !device.connected}
+					title={device.connected ? undefined : 'Connect a device first.'}
+					onclick={checkForUpdates}
+				>
+					{checking ? 'Checking...' : 'Check for updates'}
+				</button>
+			</div>
+			{#if checked && !checking}
+				{#if device.firmwareUpdates.length > 0}
+					<p class="field-hint">
+						{device.firmwareUpdates.length} update{device.firmwareUpdates.length === 1 ? '' : 's'} available
+						for the connected device.
+					</p>
+				{:else}
+					<p class="field-hint">No newer package found in the archive.</p>
+				{/if}
+			{/if}
+
+			{#if device.lastError}
+				<p class="field-hint error-text">{device.lastError}</p>
+			{/if}
+		</section>
+
+		<section class="plate">
+			<div class="plate-head">
+				<h2 class="plate-title">Acquire a package</h2>
+			</div>
+
+			<div class="acquire-block">
+				<div class="field-row">
+					<div>
+						<div class="field-label">Watch for publication</div>
+						<div class="field-hint">
+							Checks the vendor's own configuration files and firmware directory paths for a
+							change, and reports what it finds. Never downloads or installs anything on its own;
+							a changed file is evidence to look at, not proof that firmware is available. Runs
+							once at app start plus a slow periodic check in the background; can be turned off in
+							app preferences.
+						</div>
+					</div>
+					<button class="btn" disabled={watching} onclick={checkPublication}>
+						{watching ? 'Checking...' : 'Check for publication'}
+					</button>
+				</div>
+				{#if device.firmwareWatchReport}
+					{@const report = device.firmwareWatchReport}
+					<div class="watch-report">
+						<p class="field-hint">
+							Checked {formatUnixSeconds(report.checkedAt)}.
+							{report.hasFindings
+								? 'Something has changed since the last known state, listed below.'
+								: 'Nothing has changed since the last known state.'}
+						</p>
+						{#each report.configs.filter((c) => c.changed) as finding (finding.url)}
+							<div class="watch-finding">
+								<div class="field-label">{finding.description}</div>
+								<p class="field-hint">{finding.summary}</p>
+								{#each finding.evidence as snippet (snippet)}
+									<code class="evidence-snippet mono">{snippet}</code>
+								{/each}
+							</div>
 						{/each}
+						{#each report.directories.filter((d) => d.notable) as finding (finding.url)}
+							<div class="watch-finding">
+								<div class="field-label">{finding.description}</div>
+								<p class="field-hint">{finding.summary}</p>
+							</div>
+						{/each}
+						{#each report.fetchErrors as err (err.url)}
+							<p class="field-hint error-text">{err.url}: could not be checked ({err.reason})</p>
+						{/each}
+						{#if !report.hasFindings}
+							<p class="field-hint">{report.disclaimer}</p>
+						{/if}
 					</div>
-				{/each}
-				{#each report.directories.filter((d) => d.notable) as finding (finding.url)}
-					<div class="watch-finding">
-						<div class="field-label">{finding.description}</div>
-						<p class="field-hint">{finding.summary}</p>
-					</div>
-				{/each}
-				{#each report.fetchErrors as err (err.url)}
-					<p class="field-hint error-text">{err.url}: could not be checked ({err.reason})</p>
-				{/each}
-				{#if !report.hasFindings}
-					<p class="field-hint">{report.disclaimer}</p>
 				{/if}
 			</div>
-		{/if}
 
-		<div class="divider"></div>
+			<div class="rule"></div>
 
-		<div class="field-row">
-			<div>
-				<div class="field-label">Import a package</div>
-				<div class="field-hint">
-					Accepts only a package whose identity markers match this hardware.
+			<div class="acquire-block">
+				<div class="field-row">
+					<div>
+						<div class="field-label">Import a package</div>
+						<div class="field-hint">
+							Accepts only a package whose identity markers match this hardware.
+						</div>
+					</div>
+					<button
+						class="btn"
+						disabled={importing || !device.connected}
+						title={device.connected ? undefined : 'Connect a device first.'}
+						onclick={() => fileInput?.click()}
+					>
+						{importing ? 'Importing...' : 'Choose file'}
+					</button>
+					<input
+						bind:this={fileInput}
+						type="file"
+						accept=".bin"
+						class="hidden-input"
+						onchange={onFileChosen}
+					/>
 				</div>
 			</div>
-			<button class="btn" disabled={importing} onclick={() => fileInput?.click()}>
-				{importing ? 'Importing...' : 'Choose file'}
-			</button>
-			<input
-				bind:this={fileInput}
-				type="file"
-				accept=".bin"
-				class="hidden-input"
-				onchange={onFileChosen}
-			/>
-		</div>
-
-		{#if device.lastError}
-			<p class="field-hint error-text">{device.lastError}</p>
-		{/if}
-	</section>
+		</section>
+	</div>
 </div>
 
 <style>
 	.page-pad {
-		padding: 0 32px 32px;
+		padding: 0 var(--space-lg) var(--space-lg);
 	}
 
-	.firmware-empty {
-		text-align: left;
-		align-items: flex-start;
-		gap: 10px;
+	/* Asymmetric on purpose: the archive panel carries the list, the empty state and the
+	   check-for-updates row, while the acquire panel (now just publication watch and import,
+	   the vendor-request block having been dropped) is lighter. An even split would leave the
+	   acquire column's width unused by its own shorter content; this gives that width back to
+	   the panel that needs it instead of stretching the lighter one to match. */
+	.firmware-grid {
+		grid-template-columns: minmax(380px, 3fr) minmax(320px, 2fr);
+		align-items: start;
 	}
 
-	.firmware-empty p {
-		color: var(--text-muted);
-		font-size: 12.5px;
-		max-width: 60ch;
+	@media (max-width: 900px) {
+		.firmware-grid {
+			grid-template-columns: 1fr;
+		}
 	}
 
-	.disabled-actions {
-		display: flex;
-		gap: 8px;
+	.plate-title {
+		margin: 0;
+		font-size: var(--text-sm);
+		font-weight: 600;
+		color: var(--color-ink);
+	}
+
+	.plate-subtitle {
+		margin: 0 0 var(--space-2xs);
+		font-size: var(--text-xs);
+		color: var(--color-muted);
+	}
+
+	.caution {
+		color: var(--color-warning);
+		margin-bottom: var(--space-sm);
+	}
+
+	.rule {
+		height: 1px;
+		background: var(--color-rule-2);
+		margin: var(--space-md) 0;
 	}
 
 	.firmware-list {
@@ -284,7 +346,15 @@ Thank you for your help.`;
 		padding: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 8px;
+		gap: var(--space-2xs);
+		max-height: 22rem;
+		overflow-y: auto;
+	}
+
+	.firmware-item {
+		background: var(--color-paper-3);
+		border: 1px solid var(--color-rule);
+		padding: var(--space-xs) var(--space-sm);
 	}
 
 	.firmware-row {
@@ -292,17 +362,34 @@ Thank you for your help.`;
 		flex-wrap: wrap;
 		justify-content: space-between;
 		align-items: center;
-		gap: 8px 12px;
-		background: var(--bg-raised);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		padding: 10px 12px;
+		gap: var(--space-2xs) var(--space-sm);
 	}
 
-	.divider {
-		height: 1px;
-		background: var(--border-soft);
-		margin: 18px 0;
+	.progress {
+		margin-top: var(--space-xs);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3xs);
+	}
+
+	.progress-track {
+		display: flex;
+		gap: 2px;
+		height: 6px;
+	}
+
+	.progress-seg {
+		flex: 1;
+		background: var(--color-rule);
+	}
+
+	.progress-seg.filled {
+		background: var(--color-accent);
+	}
+
+	.progress-readout {
+		font-size: var(--text-xs);
+		color: var(--color-muted);
 	}
 
 	.hidden-input {
@@ -310,48 +397,33 @@ Thank you for your help.`;
 	}
 
 	.error-text {
-		color: var(--danger);
-	}
-
-	.vendor-request {
-		background: var(--bg-raised);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		padding: 12px;
-		margin: 10px 0;
-		font-family: var(--font-mono);
-		font-size: 11.5px;
-		line-height: 1.5;
-		white-space: pre-wrap;
-		max-height: 260px;
-		overflow-y: auto;
+		color: var(--color-danger);
 	}
 
 	.watch-report {
-		margin-top: 10px;
+		margin-top: var(--space-2xs);
 		display: flex;
 		flex-direction: column;
-		gap: 8px;
+		gap: var(--space-2xs);
+		max-height: 16rem;
+		overflow-y: auto;
 	}
 
 	.watch-finding {
-		background: var(--bg-raised);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		padding: 10px 12px;
+		background: var(--color-paper-3);
+		border: 1px solid var(--color-rule);
+		padding: var(--space-xs) var(--space-sm);
 		display: flex;
 		flex-direction: column;
-		gap: 4px;
+		gap: var(--space-3xs);
 	}
 
 	.evidence-snippet {
 		display: block;
-		font-family: var(--font-mono);
-		font-size: 11px;
-		color: var(--text-muted);
-		background: var(--border-soft);
-		border-radius: var(--radius-sm);
-		padding: 4px 6px;
+		font-size: var(--text-xs);
+		color: var(--color-muted);
+		background: var(--color-rule-2);
+		padding: var(--space-3xs) var(--space-2xs);
 		white-space: pre-wrap;
 		word-break: break-word;
 	}

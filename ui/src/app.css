@@ -1,29 +1,69 @@
-/* Hyperpace design tokens. Dark only, by product decision (docs/plans/hyperpace.md). */
+/* Hallmark · genre: atmospheric · macrostructure: Workbench · design-system: design.md · designed-as-app
+ * theme: custom · vibe: "deep space, starlight, instrument-grade, cold vacuum"
+ * paper: oklch(14% 0.014 265) · accent: oklch(80% 0.14 200) · shape: cut plate, zero radius
+ * display: Space Grotesk · body: Geist · mono: JetBrains Mono
+ * axes: dark / geometric-sans / cool · studied: no
+ */
+
+/* Hyperpace design tokens. Dark only, by product decision (docs/plans/hyperpace.md). Verbatim
+   export from design.md's tokens.css: this file is the single source, design.md is a mirror. */
 :root {
-	--bg: #0a0b0d;
-	--bg-raised: #101317;
-	--panel: #15171b;
-	--panel-raised: #1b1e24;
-	--border: #24272e;
-	--border-soft: #1b1e24;
-	--text: #e7e9ec;
-	--text-muted: #8b929d;
-	--text-faint: #565c66;
-	--accent: #5b8cff;
-	--accent-strong: #7ea2ff;
-	--accent-soft: rgba(91, 140, 255, 0.14);
-	--success: #35d399;
-	--success-soft: rgba(53, 211, 153, 0.14);
-	--warning: #f2b84b;
-	--warning-soft: rgba(242, 184, 75, 0.14);
-	--danger: #f2685c;
-	--danger-soft: rgba(242, 104, 92, 0.14);
-	--radius-sm: 6px;
-	--radius: 10px;
-	--radius-lg: 14px;
-	--font-ui:
-		'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-	--font-mono: 'SF Mono', 'Cascadia Code', ui-monospace, Menlo, monospace;
+	--color-paper: oklch(14% 0.014 265);
+	--color-paper-2: oklch(17% 0.016 265);
+	--color-paper-3: oklch(21% 0.016 265);
+	--color-ink: oklch(93% 0.01 250);
+	--color-ink-2: oklch(72% 0.01 250);
+	--color-muted: oklch(56% 0.012 255);
+	--color-rule: oklch(30% 0.014 265);
+	--color-rule-2: oklch(25% 0.012 265);
+	--color-accent: oklch(80% 0.14 200);
+	--color-accent-ink: oklch(14% 0.014 265);
+	--color-focus: oklch(84% 0.19 200);
+	--color-warning: oklch(80% 0.13 75);
+	--color-danger: oklch(66% 0.17 25);
+	--color-ok: oklch(78% 0.12 155);
+
+	--font-display: 'Space Grotesk Variable', 'Space Grotesk', sans-serif;
+	--font-body: 'Geist Variable', 'Geist', system-ui, sans-serif;
+	--font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+	--color-faint: oklch(44% 0.012 258);
+	--color-accent-soft: oklch(80% 0.14 200 / 0.14);
+	--color-ok-soft: oklch(78% 0.12 155 / 0.14);
+	--color-warning-soft: oklch(80% 0.13 75 / 0.14);
+	--color-danger-soft: oklch(66% 0.17 25 / 0.14);
+
+	--space-3xs: 0.25rem;
+	--space-2xs: 0.5rem;
+	--space-xs: 0.75rem;
+	--space-sm: 1rem;
+	--space-md: 1.5rem;
+	--space-lg: 2rem;
+	--space-xl: 3rem;
+	--space-2xl: 4.5rem;
+
+	--text-xs: 0.75rem;
+	--text-sm: 0.8125rem;
+	--text-md: 0.9375rem;
+	--text-lg: 1.125rem;
+	--text-xl: 1.5rem;
+	--text-display: clamp(1.75rem, 1.4rem + 1.2vw, 2.25rem);
+
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+	--dur-settle: 120ms;
+
+	--radius: 0;
+	--cut-panel: 14px;
+	--cut-control: 6px;
+	--cut-chip: 4px;
+
+	/* Gauge size tiers (docs/architecture/ui-controls.md section 5): a screen's own container
+	   query narrows a dial's `--dial-size` down through these as available width shrinks, so a
+	   dial loses a tier before its panel ever needs to scroll. */
+	--dial-compact: 120px;
+	--dial-default: 168px;
+	--dial-large: 232px;
+
 	color-scheme: dark;
 }
 
@@ -38,9 +78,9 @@ body {
 
 body {
 	margin: 0;
-	background: var(--bg);
-	color: var(--text);
-	font-family: var(--font-ui);
+	background: var(--color-paper);
+	color: var(--color-ink);
+	font-family: var(--font-body);
 	font-size: 13px;
 	line-height: 1.5;
 	-webkit-font-smoothing: antialiased;
@@ -52,6 +92,13 @@ h3,
 h4,
 p {
 	margin: 0;
+}
+
+/* Display type: screen titles and dial centre readouts (design.md Typography). */
+h1 {
+	font-family: var(--font-display);
+	font-weight: 600;
+	letter-spacing: -0.02em;
 }
 
 button,
@@ -71,60 +118,108 @@ button:disabled {
 }
 
 a {
-	color: var(--accent-strong);
+	color: var(--color-focus);
 }
 
 ::selection {
-	background: var(--accent-soft);
+	background: var(--color-accent-soft);
 }
 
 /* Scrollbars: unobtrusive, dark-matched */
 * {
 	scrollbar-width: thin;
-	scrollbar-color: var(--border) transparent;
+	scrollbar-color: var(--color-rule) transparent;
 }
 
-/* --- Shared primitives ------------------------------------------------ */
-
-.panel {
-	background: var(--panel);
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	padding: 18px;
+/* Every value a device reports (DPI, hertz, milliseconds, percent, version strings, byte
+   counts) reads in mono with tabular figures, never the body font. One class so a numeric
+   readout never drifts from this rule component by component. */
+.mono {
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
 }
 
-.panel-title {
-	font-size: 13px;
-	font-weight: 600;
-	color: var(--text);
-	margin-bottom: 2px;
+/* --- The cut plate ------------------------------------------------------
+   Nothing in this app is round (design.md "Shape: nothing is round"). In place of a radius,
+   every plate, control and chip below is a machined shape: a straight clip-path cut, never a
+   curve. Five utilities carry every screen; the four agents restyling the screens on top of
+   this foundation use these names, not new ones. */
+
+/* .plate: the panel. --color-paper-2 ground, 1px --color-rule hairline, top-right corner cut at
+   --cut-panel. clip-path clips a normal border too, so the hairline is drawn as a second,
+   inset layer instead: the plate itself is filled with the rule colour and clipped to the full
+   cut shape (this is what shows through as the 1px line), and a ::before inset by 1px is
+   clipped to the same shape and filled with the panel ground, sitting behind real content via
+   a negative z-index inside the plate's own isolated stacking context. */
+.plate {
+	position: relative;
+	isolation: isolate;
+	background: var(--color-rule);
+	padding: var(--space-md);
+	clip-path: polygon(0 0, calc(100% - var(--cut-panel)) 0, 100% var(--cut-panel), 100% 100%, 0 100%);
 }
 
-.panel-subtitle {
-	font-size: 12px;
-	color: var(--text-muted);
-	margin-bottom: 14px;
+.plate::before {
+	content: '';
+	position: absolute;
+	inset: 1px;
+	z-index: -1;
+	background: var(--color-paper-2);
+	clip-path: polygon(0 0, calc(100% - var(--cut-panel)) 0, 100% var(--cut-panel), 100% 100%, 0 100%);
 }
 
+/* .plate-head: the panel header strip, a title row above a 1px hairline. */
+.plate-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--space-xs);
+	padding-bottom: var(--space-2xs);
+	margin-bottom: var(--space-sm);
+	border-bottom: 1px solid var(--color-rule);
+}
+
+/* .plate-stub: the 2px accent stub marking the active panel, 24px tall. A plain element, not a
+   pseudo-element, so a screen drops it as the first child of a .plate-head (or of the panel
+   itself) on whichever panel is active; there is nothing to position or offset. */
+.plate-stub {
+	display: inline-block;
+	width: 2px;
+	height: 24px;
+	flex-shrink: 0;
+	background: var(--color-accent);
+}
+
+/* .btn / .btn-primary / .btn-danger: the CTA voice (design.md "CTA voice"). Cut on both right
+   corners at --cut-control. Bare .btn is the secondary voice already (rule outline, ink text,
+   transparent fill); .btn-primary and .btn-danger layer on top of it. */
 .btn {
 	display: inline-flex;
 	align-items: center;
-	gap: 6px;
-	background: var(--panel-raised);
-	border: 1px solid var(--border);
-	color: var(--text);
-	border-radius: var(--radius-sm);
-	padding: 7px 13px;
-	font-size: 12.5px;
+	gap: var(--space-3xs);
+	background: transparent;
+	border: 1px solid var(--color-rule);
+	color: var(--color-ink);
+	padding: var(--space-2xs) var(--space-sm);
+	font-family: var(--font-body);
+	font-size: var(--text-sm);
 	font-weight: 500;
+	clip-path: polygon(
+		0 0,
+		calc(100% - var(--cut-control)) 0,
+		100% var(--cut-control),
+		100% calc(100% - var(--cut-control)),
+		calc(100% - var(--cut-control)) 100%,
+		0 100%
+	);
 	transition:
-		background 0.12s ease,
-		border-color 0.12s ease,
-		opacity 0.12s ease;
+		background var(--dur-settle) var(--ease-out),
+		border-color var(--dur-settle) var(--ease-out),
+		opacity var(--dur-settle) var(--ease-out);
 }
 
 .btn:hover:not(:disabled) {
-	border-color: var(--text-faint);
+	border-color: var(--color-faint);
 }
 
 .btn:disabled {
@@ -132,68 +227,150 @@ a {
 }
 
 .btn-primary {
-	background: var(--accent);
-	border-color: var(--accent);
-	color: #06090f;
+	background: var(--color-accent);
+	border-color: var(--color-accent);
+	color: var(--color-accent-ink);
 	font-weight: 600;
 }
 
 .btn-primary:hover:not(:disabled) {
-	background: var(--accent-strong);
-	border-color: var(--accent-strong);
+	background: var(--color-focus);
+	border-color: var(--color-focus);
 }
 
 .btn-danger {
 	background: transparent;
-	border-color: var(--danger);
-	color: var(--danger);
+	border-color: var(--color-danger);
+	color: var(--color-danger);
 }
 
 .btn-danger:hover:not(:disabled) {
-	background: var(--danger-soft);
+	background: var(--color-danger-soft);
 }
 
 .field {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: var(--space-2xs);
 }
 
 .field-row {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 8px 16px;
+	gap: var(--space-2xs) var(--space-sm);
 	flex-wrap: wrap;
 }
 
 .field-label {
-	font-size: 12.5px;
-	color: var(--text);
+	font-size: var(--text-sm);
+	color: var(--color-ink);
 	font-weight: 500;
 }
 
 .field-hint {
-	font-size: 11.5px;
-	color: var(--text-muted);
+	font-size: var(--text-xs);
+	color: var(--color-muted);
 }
 
+/* .field's controls: square inputs and selects. Focus is a 2px square --color-focus outline
+   with a 2px offset, never a glow, never rounded (design.md "Shape: nothing is round"). */
 select,
 .text-input {
 	appearance: none;
-	background: var(--bg-raised);
-	border: 1px solid var(--border);
-	border-radius: var(--radius-sm);
-	padding: 6px 10px;
-	color: var(--text);
-	font-size: 12.5px;
+	background: var(--color-paper);
+	border: 1px solid var(--color-rule);
+	padding: var(--space-2xs) var(--space-xs);
+	color: var(--color-ink);
+	font-size: var(--text-sm);
 }
 
 select:focus-visible,
 .text-input:focus-visible,
-button:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 1px;
+button:focus-visible,
+[tabindex]:focus-visible {
+	outline: 2px solid var(--color-focus);
+	outline-offset: 2px;
+}
+
+/* .chip: swatches, tags and the connection badge, cut at --cut-chip. Tone modifiers stand in
+   for the old .tag-success / .tag-warning / .tag-danger / .tag-neutral set. */
+.chip {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-3xs);
+	font-size: var(--text-xs);
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+	padding: var(--space-3xs) var(--space-2xs);
+	background: var(--color-paper-3);
+	border: 1px solid var(--color-rule);
+	color: var(--color-muted);
+	clip-path: polygon(0 0, calc(100% - var(--cut-chip)) 0, 100% var(--cut-chip), 100% 100%, 0 100%);
+}
+
+.chip-ok {
+	background: var(--color-ok-soft);
+	color: var(--color-ok);
+	border-color: transparent;
+}
+
+.chip-warning {
+	background: var(--color-warning-soft);
+	color: var(--color-warning);
+	border-color: transparent;
+}
+
+.chip-danger {
+	background: var(--color-danger-soft);
+	color: var(--color-danger);
+	border-color: transparent;
+}
+
+.chip-neutral {
+	background: var(--color-paper-3);
+	color: var(--color-muted);
+}
+
+.grid {
+	display: grid;
+	gap: var(--space-md);
+}
+
+/* --- Transitional aliases -------------------------------------------------
+   The Buttons/Performance/Macros/Lighting/Firmware/Settings screens and the gauge controls are
+   restyled by the four agents that follow this one; until each screen switches its markup from
+   `panel`/`empty-state` to `plate`, these keep it on the cut-plate ground and tokens instead of
+   rendering unstyled. Delete each alias as its last consuming screen migrates. */
+.panel {
+	position: relative;
+	isolation: isolate;
+	background: var(--color-rule);
+	padding: var(--space-md);
+	clip-path: polygon(0 0, calc(100% - var(--cut-panel)) 0, 100% var(--cut-panel), 100% 100%, 0 100%);
+}
+
+.panel::before {
+	content: '';
+	position: absolute;
+	inset: 1px;
+	z-index: -1;
+	background: var(--color-paper-2);
+	clip-path: polygon(0 0, calc(100% - var(--cut-panel)) 0, 100% var(--cut-panel), 100% 100%, 0 100%);
+}
+
+.panel-title {
+	font-size: var(--text-sm);
+	font-weight: 600;
+	color: var(--color-ink);
+	margin-bottom: 2px;
+}
+
+.panel-subtitle {
+	font-size: var(--text-xs);
+	color: var(--color-muted);
+	margin-bottom: var(--space-sm);
 }
 
 .empty-state {
@@ -202,53 +379,14 @@ button:focus-visible {
 	align-items: center;
 	justify-content: center;
 	text-align: center;
-	gap: 6px;
-	padding: 40px 24px;
-	color: var(--text-muted);
-	border: 1px dashed var(--border);
-	border-radius: var(--radius);
+	gap: var(--space-2xs);
+	padding: var(--space-xl) var(--space-md);
+	color: var(--color-muted);
+	border: 1px dashed var(--color-rule);
 }
 
 .empty-state strong {
-	color: var(--text);
-	font-size: 13px;
+	color: var(--color-ink);
+	font-size: var(--text-sm);
 	font-weight: 600;
-}
-
-.tag {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
-	font-size: 11px;
-	font-weight: 600;
-	letter-spacing: 0.02em;
-	text-transform: uppercase;
-	padding: 3px 8px;
-	border-radius: 999px;
-}
-
-.tag-success {
-	background: var(--success-soft);
-	color: var(--success);
-}
-
-.tag-warning {
-	background: var(--warning-soft);
-	color: var(--warning);
-}
-
-.tag-danger {
-	background: var(--danger-soft);
-	color: var(--danger);
-}
-
-.tag-neutral {
-	background: var(--panel-raised);
-	color: var(--text-muted);
-	border: 1px solid var(--border);
-}
-
-.grid {
-	display: grid;
-	gap: 16px;
 }

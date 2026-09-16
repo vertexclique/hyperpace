@@ -36,23 +36,24 @@
 </div>
 
 <style>
+	/* A square track and a square knob: the pill-shaped switch is the one control design.md's
+	   "nothing is round" rule forbids most on sight, so it gets no exception. */
 	.switch {
-		width: 38px;
-		height: 22px;
-		border-radius: 999px;
-		background: var(--bg-raised);
-		border: 1px solid var(--border);
+		width: 36px;
+		height: 20px;
+		background: var(--color-paper);
+		border: 1px solid var(--color-rule);
 		padding: 2px;
 		display: flex;
 		align-items: center;
 		justify-content: flex-start;
-		transition: background 0.15s ease;
+		transition: background var(--dur-settle) var(--ease-out);
 		flex-shrink: 0;
 	}
 
 	.switch.on {
-		background: var(--accent);
-		border-color: var(--accent);
+		background: var(--color-accent-soft);
+		border-color: var(--color-accent);
 		justify-content: flex-end;
 	}
 
@@ -61,9 +62,12 @@
 	}
 
 	.knob {
-		width: 16px;
-		height: 16px;
-		border-radius: 50%;
-		background: var(--text);
+		width: 14px;
+		height: 14px;
+		background: var(--color-ink);
+	}
+
+	.switch.on .knob {
+		background: var(--color-accent);
 	}
 </style>

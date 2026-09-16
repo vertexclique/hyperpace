@@ -132,7 +132,7 @@
 	// unassigned button already displays with a device connected, and the Action select below
 	// marks itself `unknown` in that case so "Disabled" is never shown as if it were a reading.
 	$effect(() => {
-		draft = selectedAction ? structuredClone(selectedAction) : defaultForKind('disabled');
+		draft = selectedAction ? $state.snapshot(selectedAction) : defaultForKind('disabled');
 	});
 
 	async function loadKeystroke(index: number) {
@@ -248,7 +248,7 @@
 </script>
 
 <div class="layout">
-	<div class="art-column panel">
+	<div class="art-column">
 		<MouseArt
 			selected={selected}
 			onselect={selectHotspot}
@@ -256,39 +256,69 @@
 			activeCount={buttons.length || 5}
 		/>
 		<p class="field-hint art-caption">Select a button to edit its action.</p>
+		{#if hasData && buttons.length < BUTTON_LABELS.length}
+			<p class="field-hint unsupported-note">
+				{BUTTON_LABELS.length - buttons.length} button{BUTTON_LABELS.length - buttons.length === 1
+					? ''
+					: 's'} not on this device.
+			</p>
+		{/if}
 	</div>
 
 	<div class="content-column">
 		{#if selected === null}
-			<div class="panel">
-				<div class="panel-title">Buttons</div>
-				<div class="panel-subtitle">
+			<div class="plate list-plate">
+				<div class="plate-head">
+					<div class="plate-title-group">
+						<span class="plate-stub"></span>
+						<span class="plate-title">Buttons</span>
+					</div>
+				</div>
+				<p class="field-hint plate-subtitle">
 					{#if hasData}
 						{buttons.length} button{buttons.length === 1 ? '' : 's'} reported by this device.
 					{:else}
-						{BUTTON_LABELS.length} buttons (default layout).
-						<span class="caption-note">No device connected.</span>
+						{BUTTON_LABELS.length} buttons shown (default layout).{#if !device.connected} No mouse connected.{/if}
 					{/if}
-				</div>
+				</p>
 				<ul class="button-list">
-					{#each Array.from({ length: hasData ? buttons.length : BUTTON_LABELS.length }) as _, i (i)}
+					{#each BUTTON_LABELS as label, i (i)}
+						{@const unavailable = hasData && i >= buttons.length}
 						<li>
-							<button type="button" class="list-row" onclick={() => selectHotspot(i)}>
-								<span>{BUTTON_LABELS[i] ?? `Button ${i + 1}`}</span>
-								<span class="field-hint">{hasData ? actionSummary(buttons[i]) : '-'}</span>
+							<button
+								type="button"
+								class="list-row"
+								disabled={unavailable}
+								onclick={() => selectHotspot(i)}
+							>
+								<span class="row-label">{label}</span>
+								<span class="field-hint">
+									{#if !hasData}
+										-
+									{:else if unavailable}
+										Not on this device
+									{:else}
+										{actionSummary(buttons[i])}
+									{/if}
+								</span>
 							</button>
 						</li>
 					{/each}
 				</ul>
 			</div>
 		{:else}
-			<div class="panel">
-				<div class="panel-title">{BUTTON_LABELS[selected] ?? `Button ${selected + 1}`}</div>
-				<div class="panel-subtitle">
-					Currently: {hasData && selectedAction ? actionSummary(selectedAction) : '-'}
+			<div class="plate editor-plate">
+				<div class="plate-head">
+					<div class="plate-title-group">
+						<span class="plate-stub"></span>
+						<span class="plate-title">{BUTTON_LABELS[selected] ?? `Button ${selected + 1}`}</span>
+					</div>
 				</div>
+				<p class="field-hint plate-subtitle">
+					Currently: {hasData && selectedAction ? actionSummary(selectedAction) : '-'}
+				</p>
 
-				<div class="grid" style="gap: 14px">
+				<div class="grid">
 					<SelectField
 						label="Action"
 						value={draft.type}
@@ -354,20 +384,23 @@
 							onchange={(v) => draft && draft.type === 'fire' && (draft.intervalMs = v)}
 						/>
 					{:else if draft.type === 'keystroke'}
-						<div class="field-label">Modifiers</div>
-						<div class="modifier-grid">
-							{#each MODIFIER_OPTIONS as mod (mod.value)}
-								<label class="modifier-check">
-									<input
-										type="checkbox"
-										checked={keystrokeDraft.modifiers.includes(mod.value)}
+						<div class="field">
+							<span class="field-label">Modifiers</span>
+							<div class="modifier-grid">
+								{#each MODIFIER_OPTIONS as mod (mod.value)}
+									{@const pressed = keystrokeDraft.modifiers.includes(mod.value)}
+									<button
+										type="button"
+										class="chip mod-chip"
+										class:chip-active={pressed}
+										aria-pressed={pressed}
 										disabled={!hasData}
-										onchange={(e) =>
-											toggleModifier(mod.value, (e.target as HTMLInputElement).checked)}
-									/>
-									{mod.label}
-								</label>
-							{/each}
+										onclick={() => toggleModifier(mod.value, !pressed)}
+									>
+										{mod.label}
+									</button>
+								{/each}
+							</div>
 						</div>
 						<SelectField
 							label="Key"
@@ -443,29 +476,52 @@
 <style>
 	.layout {
 		display: flex;
-		gap: 20px;
-		padding: 0 32px 32px;
+		gap: var(--space-md);
+		padding: 0 var(--space-lg) var(--space-lg);
 		align-items: flex-start;
 	}
 
 	.art-column {
-		width: 260px;
+		width: 360px;
 		flex-shrink: 0;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 8px;
-		position: sticky;
-		top: 20px;
+		gap: var(--space-sm);
 	}
 
 	.art-caption {
 		text-align: center;
 	}
 
+	.unsupported-note {
+		text-align: center;
+		color: var(--color-warning);
+	}
+
 	.content-column {
 		flex: 1;
-		min-width: 0;
+		min-width: 360px;
+	}
+
+	/* Groups the active-panel stub with its title so `.plate-head`'s own space-between keeps
+	   them together at the head's leading edge (design.md "A panel header is a strip above a
+	   hairline. The active panel carries a 2px accent stub..."). */
+	.plate-title-group {
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-2xs);
+	}
+
+	.plate-title {
+		font-family: var(--font-display);
+		font-size: var(--text-md);
+		font-weight: 600;
+		color: var(--color-ink);
+	}
+
+	.plate-subtitle {
+		margin-bottom: var(--space-sm);
 	}
 
 	.button-list {
@@ -474,58 +530,81 @@
 		padding: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 6px;
+	}
+
+	/* Rows separated by hairlines, not individually boxed (design.md: depth comes from the paper
+	   steps and the hairlines, never a border-per-card). */
+	.button-list > li + li {
+		border-top: 1px solid var(--color-rule);
 	}
 
 	.list-row {
 		width: 100%;
 		display: flex;
 		justify-content: space-between;
-		gap: 12px;
-		background: var(--bg-raised);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		padding: 10px 12px;
+		align-items: center;
+		gap: var(--space-sm);
+		background: transparent;
+		border: none;
+		padding: var(--space-xs) var(--space-2xs);
 		text-align: left;
-		font-size: 12.5px;
+		font-size: var(--text-sm);
 	}
 
-	.list-row:hover {
-		border-color: var(--text-faint);
+	.list-row:hover:not(:disabled) {
+		background: var(--color-paper-3);
+	}
+
+	.list-row:disabled {
+		opacity: 0.45;
+	}
+
+	.row-label {
+		font-weight: 500;
+		color: var(--color-ink);
 	}
 
 	.actions-row {
 		display: flex;
-		gap: 8px;
-		margin-top: 18px;
+		gap: var(--space-2xs);
+		margin-top: var(--space-md);
 	}
 
 	.error-text {
-		color: var(--danger);
-		margin-top: 10px;
+		color: var(--color-danger);
+		margin-top: var(--space-sm);
 	}
 
 	.modifier-grid {
 		display: grid;
 		grid-template-columns: repeat(4, 1fr);
-		gap: 6px 10px;
+		gap: var(--space-2xs);
 	}
 
-	.modifier-check {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		font-size: 12.5px;
-		color: var(--text-faint);
+	/* The chord being built is a live value, so its pressed modifiers earn the accent
+	   (design.md "Accent appears only on live values..."); unpressed ones stay in the ordinary
+	   .chip voice. */
+	.mod-chip {
+		width: 100%;
+		justify-content: center;
 	}
 
-	.caption-note {
-		color: var(--text-faint);
+	.mod-chip:not(:disabled):hover {
+		border-color: var(--color-faint);
+	}
+
+	.mod-chip:disabled {
+		opacity: 0.45;
+	}
+
+	.mod-chip.chip-active {
+		background: var(--color-accent-soft);
+		border-color: var(--color-accent);
+		color: var(--color-accent);
 	}
 
 	/* Below the window's minimum width, stack the mouse art above the button list/editor instead
-	   of squeezing both into one row; the art column drops its sticky offset since it is no
-	   longer beside a taller sibling to stay level with. */
+	   of squeezing both into one row. */
 	@media (max-width: 900px) {
 		.layout {
 			flex-direction: column;
@@ -533,7 +612,6 @@
 
 		.art-column {
 			width: 100%;
-			position: static;
 		}
 	}
 </style>

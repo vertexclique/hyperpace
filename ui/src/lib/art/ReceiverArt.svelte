@@ -1,84 +1,61 @@
 <script lang="ts">
-	// Original receiver illustration for Hyperpace: a small USB dongle body
-	// with a status LED. No vendor artwork or branding.
+	// The manufacturer's own render (ui/static/device/receiver.png, 169x95; see
+	// ui/static/device/PROVENANCE.md). The render carries no LED overlay in the source art, so
+	// pairing state is read from a status chip below it rather than a tint on the photo itself
+	// (design.md Assets: "the white faces are kept white", no tint on the render).
+	//
+	// `status` never claims "not paired" from missing data: `unknown` is the honest state when
+	// this app has no positive proof either way (see LightingScreen's `receiverArtStatus`, which
+	// derives it from the live wireless link, not from an idle pairing session).
 
 	interface Props {
-		status?: 'idle' | 'pairing' | 'paired';
+		status?: 'unknown' | 'pairing' | 'paired';
 	}
 
-	let { status = 'idle' }: Props = $props();
+	let { status = 'unknown' }: Props = $props();
+
+	const STATUS_LABEL: Record<'unknown' | 'pairing' | 'paired', string> = {
+		unknown: 'Pairing unknown',
+		pairing: 'Pairing',
+		paired: 'Paired'
+	};
+
+	const STATUS_TONE: Record<'unknown' | 'pairing' | 'paired', 'neutral' | 'warning' | 'ok'> = {
+		unknown: 'neutral',
+		pairing: 'warning',
+		paired: 'ok'
+	};
 </script>
 
-<svg viewBox="0 0 140 100" class="receiver-art" role="img" aria-label="Receiver">
-	<rect class="plug" x="6" y="40" width="26" height="20" rx="3" />
-	<rect class="body" x="30" y="18" width="86" height="64" rx="12" />
-	<rect class="seam" x="30" y="46" width="86" height="1.4" />
-	<circle
-		class="led"
-		class:pairing={status === 'pairing'}
-		class:paired={status === 'paired'}
-		cx="96"
-		cy="32"
-		r="4.2"
-	/>
-	<path class="wave" d="M104,58 q6,6 0,12" />
-	<path class="wave wave-2" d="M110,54 q12,10 0,20" />
-</svg>
+<!-- Root keeps the class name `receiver-art`: LightingScreen.svelte sizes this component from
+     the outside with `.receiver-layout :global(.receiver-art)`. -->
+<div class="receiver-art">
+	<img src="/device/receiver.png" alt="Receiver" class="render" />
+	<span class="chip chip-{STATUS_TONE[status]}">
+		<span class="dot"></span>
+		{STATUS_LABEL[status]}
+	</span>
+</div>
 
 <style>
 	.receiver-art {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: var(--space-2xs);
+	}
+
+	/* No drop shadow, no rounded frame, no tint (design.md Assets). */
+	.render {
 		width: 100%;
-		max-width: 150px;
 		height: auto;
+		display: block;
 	}
 
-	.plug {
-		fill: var(--bg-raised);
-		stroke: var(--border);
-		stroke-width: 1.2;
-	}
-
-	.body {
-		fill: var(--panel-raised);
-		stroke: var(--border);
-		stroke-width: 1.5;
-	}
-
-	.seam {
-		fill: var(--border);
-	}
-
-	.led {
-		fill: var(--text-faint);
-	}
-
-	.led.pairing {
-		fill: var(--warning);
-		animation: pulse 1s ease-in-out infinite;
-	}
-
-	.led.paired {
-		fill: var(--success);
-	}
-
-	.wave {
-		fill: none;
-		stroke: var(--text-faint);
-		stroke-width: 1.4;
-		stroke-linecap: round;
-	}
-
-	.wave-2 {
-		opacity: 0.6;
-	}
-
-	@keyframes pulse {
-		0%,
-		100% {
-			opacity: 1;
-		}
-		50% {
-			opacity: 0.35;
-		}
+	.dot {
+		width: 5px;
+		height: 5px;
+		background: currentColor;
+		flex-shrink: 0;
 	}
 </style>

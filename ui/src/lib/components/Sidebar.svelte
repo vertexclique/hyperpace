@@ -1,8 +1,6 @@
 <script lang="ts">
 	import type { ScreenId } from '../types';
 	import Icon from './Icon.svelte';
-	import ConnectionBadge from './ConnectionBadge.svelte';
-	import BatteryIndicator from './BatteryIndicator.svelte';
 
 	interface Props {
 		active: ScreenId;
@@ -23,10 +21,18 @@
 
 <nav class="sidebar" aria-label="Screens">
 	<div class="brand">
-		<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-			<rect x="3" y="3" width="18" height="18" rx="6" fill="var(--accent)" />
-			<circle cx="12" cy="9" r="2.1" fill="#06090f" />
-			<rect x="10.2" y="12.5" width="3.6" height="6.5" rx="1.8" fill="#06090f" />
+		<!-- The Hyperpace mark, reduced to the two shapes that survive at rail size: the angular
+		     shell and its head. The full logo (art/hyperpace.svg, also served at /hyperpace.svg)
+		     carries a grid, corner brackets and traces that turn to mush below about 64px. -->
+		<svg width="22" height="22" viewBox="0 0 512 512" aria-hidden="true" class="mark">
+			<polygon
+				points="256,80 350,170 340,390 256,450 172,390 162,170"
+				fill="var(--color-paper-3)"
+				stroke="var(--color-accent)"
+				stroke-width="38"
+				stroke-linejoin="miter"
+			/>
+			<polygon points="256,120 312,186 256,232 200,186" fill="var(--color-danger)" />
 		</svg>
 		<span class="brand-name">Hyperpace</span>
 	</div>
@@ -49,10 +55,6 @@
 		{/each}
 	</ul>
 
-	<div class="sidebar-footer">
-		<ConnectionBadge />
-		<BatteryIndicator />
-	</div>
 </nav>
 
 <style>
@@ -61,8 +63,8 @@
 		flex-direction: column;
 		width: 220px;
 		flex-shrink: 0;
-		background: var(--bg-raised);
-		border-right: 1px solid var(--border);
+		background: var(--color-paper-2);
+		border-right: 1px solid var(--color-rule);
 		padding: 16px 12px;
 		height: 100%;
 	}
@@ -91,42 +93,47 @@
 	}
 
 	.nav-item {
+		position: relative;
 		width: 100%;
 		display: flex;
 		align-items: center;
 		gap: 10px;
 		background: transparent;
 		border: none;
-		color: var(--text-muted);
-		padding: 9px 10px;
-		border-radius: var(--radius-sm);
+		color: var(--color-muted);
+		padding: 9px 10px 9px 16px;
 		font-size: 13px;
 		font-weight: 500;
 		text-align: left;
 	}
 
 	.nav-item:hover {
-		background: var(--panel-raised);
-		color: var(--text);
+		background: var(--color-paper-3);
+		color: var(--color-ink);
 	}
 
 	.nav-item.active {
-		background: var(--accent-soft);
-		color: var(--accent-strong);
+		background: var(--color-paper-3);
+		color: var(--color-ink);
 	}
 
-	.sidebar-footer {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-		padding-top: 12px;
-		border-top: 1px solid var(--border-soft);
+	/* The active screen is marked by the accent stub (design.md "Shape"), never a filled pill.
+	   An absolutely positioned pseudo-element, not the shared .plate-stub child, so the icon and
+	   label never shift left when a row becomes active; it mirrors .plate-stub's 2px / 24px. */
+	.nav-item.active::before {
+		content: '';
+		position: absolute;
+		left: 0;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 2px;
+		height: 24px;
+		background: var(--color-accent);
 	}
 
 	/* Below the window's minimum width, the sidebar collapses to icons instead of eating into
-	   the content area: labels and badge text disappear (via font-size, so a child component's
-	   own icon glyphs, sized in px rather than em, stay visible), the nav column narrows and its
-	   buttons center their icon. */
+	   the content area: labels disappear, the nav column narrows and its buttons center their
+	   icon. */
 	@media (max-width: 900px) {
 		.sidebar {
 			width: 60px;
@@ -144,17 +151,6 @@
 
 		.nav-item span:last-child {
 			display: none;
-		}
-
-		.sidebar-footer {
-			align-items: center;
-		}
-
-		.sidebar-footer :global(.tag) {
-			font-size: 0;
-			padding: 4px;
-			justify-content: center;
-			gap: 0;
 		}
 	}
 </style>
