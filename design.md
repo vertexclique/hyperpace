@@ -169,7 +169,12 @@ under `prefers-reduced-motion: reduce`.
 - A write that fails returns the control to the device's last known value and shows one inline
   message on that control.
 - Dials commit once on release, never per frame of a drag.
-- Hover tooltips delay 800ms; focus tooltips appear instantly.
+- Hover tooltips delay 300ms; focus tooltips appear instantly.
+- Every adjustable control, and every panel that names a feature, carries a help tip: a 16px cut
+  "?" right after its label, using `HelpTip` with an entry from `ui/src/lib/help.ts`. One catalogue
+  for the whole app, so a setting is explained the same way everywhere. An explanation states only
+  what is established about the hardware and marks anything unconfirmed as unconfirmed. One tip per
+  concept: a table gets one on its header, not one per row.
 - `:focus-visible` shows the square focus outline immediately, never animated.
 
 ## CTA voice
