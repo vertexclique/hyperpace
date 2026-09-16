@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { device, diffSettings } from '../device.svelte';
-	import { DPI_INDICATOR_MODES, LIGHTING_MODES, RECEIVER_LIGHT_MODES } from '../types';
+	import { BLANK_SETTINGS, DPI_INDICATOR_MODES, LIGHTING_MODES, RECEIVER_LIGHT_MODES } from '../types';
 	import type {
 		DpiIndicatorMode,
 		DpiIndicatorModeName,
@@ -9,7 +9,6 @@
 		ReceiverLight,
 		Settings
 	} from '../types';
-	import EmptyState from '../components/EmptyState.svelte';
 	import SelectField from '../components/SelectField.svelte';
 	import RangeField from '../components/RangeField.svelte';
 	import Toggle from '../components/Toggle.svelte';
@@ -41,18 +40,22 @@
 		return mode === 'other' ? 'off' : mode;
 	}
 
-	let draft = $state<Settings | null>(null);
+	// `draft` is always a structurally complete Settings object, never null: when no device is
+	// connected (or its settings have not been read yet) it holds BLANK_SETTINGS instead, so
+	// every control below stays mounted. `hasData` gates each control's `disabled`/`unknown`
+	// prop, which is what actually keeps a placeholder value from ever being shown as if it were
+	// a real reading (see BLANK_SETTINGS's own doc comment).
+	let draft = $state<Settings>(structuredClone(BLANK_SETTINGS));
 	let saving = $state(false);
 	let dirty = $state(false);
+	let hasData = $derived(device.settings !== null);
 
 	$effect(() => {
-		draft = device.settings ? structuredClone(device.settings) : null;
+		draft = device.settings ? structuredClone(device.settings) : structuredClone(BLANK_SETTINGS);
 		dirty = false;
 	});
 
-	let controls = $derived(
-		draft ? lightingControls(draft.lighting.mode.mode) : { color: false, speed: false }
-	);
+	let controls = $derived(lightingControls(draft.lighting.mode.mode));
 
 	function touch() {
 		dirty = true;
@@ -61,7 +64,7 @@
 	/** Sends one `write_setting` call per field that actually changed since the last read (see
 	 * `diffSettings`); in practice just the lighting field, since this screen only edits that. */
 	async function apply() {
-		if (!draft || !device.settings) return;
+		if (!device.settings) return;
 		saving = true;
 		try {
 			await device.writeSettings(diffSettings(device.settings, draft));
@@ -137,137 +140,143 @@
 	}
 </script>
 
-<div class="page-pad grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr))">
+<div class="page-pad grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr))">
 	<section class="panel">
 		<div class="panel-title">Mouse lighting</div>
-		<div class="panel-subtitle">The body light strip and its effect.</div>
-		{#if !device.connected}
-			<EmptyState title="No device connected" message="Connect a mouse to edit its lighting." />
-		{:else if device.settingsLoading || !draft}
-			<EmptyState title="Reading settings" message="Fetching the current lighting state." />
-		{:else}
-			<div class="field-stack">
-				<Toggle
-					label="Lighting on"
-					checked={draft.lighting.on}
-					onchange={(v) => {
-						if (draft) draft.lighting = { ...draft.lighting, on: v };
+		<div class="panel-subtitle">
+			The body light strip and its effect.
+			{#if !hasData}<span class="caption-note">No device connected.</span>{/if}
+		</div>
+		<div class="field-stack">
+			<Toggle
+				label="Lighting on"
+				checked={draft.lighting.on}
+				disabled={!hasData}
+				onchange={(v) => {
+					draft.lighting = { ...draft.lighting, on: v };
+					touch();
+				}}
+			/>
+			<SelectField
+				label="Effect"
+				value={lightModeName(draft.lighting.mode.mode)}
+				options={LIGHTING_MODES}
+				unknown={!hasData}
+				onchange={(v) => {
+					draft.lighting = { ...draft.lighting, mode: { mode: v } };
+					touch();
+				}}
+			/>
+			{#if controls.color}
+				<ColorSwatchPicker
+					label="Color"
+					color={draft.lighting.color}
+					unknown={!hasData}
+					onchange={(c) => {
+						draft.lighting = { ...draft.lighting, color: c };
 						touch();
 					}}
 				/>
-				<SelectField
-					label="Effect"
-					value={lightModeName(draft.lighting.mode.mode)}
-					options={LIGHTING_MODES}
-					onchange={(v) => {
-						if (draft) draft.lighting = { ...draft.lighting, mode: { mode: v } };
-						touch();
-					}}
-				/>
-				{#if controls.color}
-					<ColorSwatchPicker
-						label="Color"
-						color={draft.lighting.color}
-						onchange={(c) => {
-							if (draft) draft.lighting = { ...draft.lighting, color: c };
-							touch();
-						}}
-					/>
-				{/if}
-				{#if controls.speed}
-					<RangeField
-						label="Speed"
-						min={0}
-						max={9}
-						value={draft.lighting.speed}
-						onchange={(v) => {
-							if (draft) draft.lighting = { ...draft.lighting, speed: v };
-							touch();
-						}}
-					/>
-				{/if}
+			{/if}
+			{#if controls.speed}
 				<RangeField
-					label="Brightness"
+					label="Speed"
 					min={0}
 					max={9}
-					value={draft.lighting.brightness}
+					value={draft.lighting.speed}
+					unknown={!hasData}
 					onchange={(v) => {
-						if (draft) draft.lighting = { ...draft.lighting, brightness: v };
+						draft.lighting = { ...draft.lighting, speed: v };
 						touch();
 					}}
 				/>
+			{/if}
+			<RangeField
+				label="Brightness"
+				min={0}
+				max={9}
+				value={draft.lighting.brightness}
+				unknown={!hasData}
+				onchange={(v) => {
+					draft.lighting = { ...draft.lighting, brightness: v };
+					touch();
+				}}
+			/>
 
-				<button class="btn btn-primary" disabled={!dirty || saving} onclick={apply}>
-					{saving ? 'Applying...' : dirty ? 'Apply changes' : 'Up to date'}
-				</button>
-				{#if device.lastError}
-					<p class="field-hint error-text">{device.lastError}</p>
-				{/if}
-			</div>
-		{/if}
+			<button class="btn btn-primary" disabled={!hasData || !dirty || saving} onclick={apply}>
+				{saving ? 'Applying...' : dirty ? 'Apply changes' : 'Up to date'}
+			</button>
+			{#if device.lastError}
+				<p class="field-hint error-text">{device.lastError}</p>
+			{/if}
+		</div>
 	</section>
 
 	<section class="panel">
 		<div class="panel-title">DPI indicator</div>
-		<div class="panel-subtitle">The per-stage indicator light: mode, brightness, speed and on/off.</div>
-		{#if !device.connected}
-			<EmptyState title="No device connected" message="Connect a mouse to edit its DPI indicator." />
-		{:else if device.settingsLoading || !draft}
-			<EmptyState title="Reading settings" message="Fetching the current DPI indicator state." />
-		{:else}
-			<div class="field-stack">
-				<Toggle
-					label="Indicator on"
-					checked={draft.dpiIndicator.on}
-					onchange={(v) => {
-						if (draft) draft.dpiIndicator = { ...draft.dpiIndicator, on: v };
-						touch();
-					}}
-				/>
-				<SelectField
-					label="Effect"
-					value={dpiIndicatorModeName(draft.dpiIndicator.mode.mode)}
-					options={DPI_INDICATOR_MODES}
-					onchange={(v) => {
-						if (draft) draft.dpiIndicator = { ...draft.dpiIndicator, mode: { mode: v } };
-						touch();
-					}}
-				/>
-				<RangeField
-					label="Brightness"
-					min={1}
-					max={10}
-					value={draft.dpiIndicator.brightness}
-					onchange={(v) => {
-						if (draft) draft.dpiIndicator = { ...draft.dpiIndicator, brightness: v };
-						touch();
-					}}
-				/>
-				<RangeField
-					label="Speed (raw)"
-					hint="Unit is not specified in the protocol reference"
-					min={0}
-					max={255}
-					value={draft.dpiIndicator.speed}
-					onchange={(v) => {
-						if (draft) draft.dpiIndicator = { ...draft.dpiIndicator, speed: v };
-						touch();
-					}}
-				/>
+		<div class="panel-subtitle">
+			The per-stage indicator light: mode, brightness, speed and on/off.
+			{#if !hasData}<span class="caption-note">No device connected.</span>{/if}
+		</div>
+		<div class="field-stack">
+			<Toggle
+				label="Indicator on"
+				checked={draft.dpiIndicator.on}
+				disabled={!hasData}
+				onchange={(v) => {
+					draft.dpiIndicator = { ...draft.dpiIndicator, on: v };
+					touch();
+				}}
+			/>
+			<SelectField
+				label="Effect"
+				value={dpiIndicatorModeName(draft.dpiIndicator.mode.mode)}
+				options={DPI_INDICATOR_MODES}
+				unknown={!hasData}
+				onchange={(v) => {
+					draft.dpiIndicator = { ...draft.dpiIndicator, mode: { mode: v } };
+					touch();
+				}}
+			/>
+			<RangeField
+				label="Brightness"
+				min={1}
+				max={10}
+				value={draft.dpiIndicator.brightness}
+				unknown={!hasData}
+				onchange={(v) => {
+					draft.dpiIndicator = { ...draft.dpiIndicator, brightness: v };
+					touch();
+				}}
+			/>
+			<RangeField
+				label="Speed (raw)"
+				hint="Unit is not specified in the protocol reference"
+				min={0}
+				max={255}
+				value={draft.dpiIndicator.speed}
+				unknown={!hasData}
+				onchange={(v) => {
+					draft.dpiIndicator = { ...draft.dpiIndicator, speed: v };
+					touch();
+				}}
+			/>
 
-				<button class="btn btn-primary" disabled={!dirty || saving} onclick={apply}>
-					{saving ? 'Applying...' : dirty ? 'Apply changes' : 'Up to date'}
-				</button>
-				{#if device.lastError}
-					<p class="field-hint error-text">{device.lastError}</p>
-				{/if}
-			</div>
-		{/if}
+			<button class="btn btn-primary" disabled={!hasData || !dirty || saving} onclick={apply}>
+				{saving ? 'Applying...' : dirty ? 'Apply changes' : 'Up to date'}
+			</button>
+			{#if device.lastError}
+				<p class="field-hint error-text">{device.lastError}</p>
+			{/if}
+		</div>
 	</section>
 
 	<section class="panel">
 		<div class="panel-title">Receiver</div>
-		<div class="panel-subtitle">The 2.4 GHz dongle: its light, pairing and a factory reset.</div>
+		<div class="panel-subtitle">
+			The 2.4 GHz dongle: its light, pairing and a factory reset.
+			{#if !hasData}<span class="caption-note">No device connected.</span>{/if}
+		</div>
 		<div class="receiver-layout">
 			<ReceiverArt status={receiverArtStatus} />
 			<div class="field-stack" style="flex:1">
@@ -275,11 +284,13 @@
 					label="Receiver light effect"
 					value={receiverLight.mode}
 					options={RECEIVER_LIGHT_MODES}
+					disabled={!hasData}
 					onchange={(v) => (receiverLight = { ...receiverLight, mode: v })}
 				/>
 				<ColorSwatchPicker
 					label="Color"
 					color={receiverLight.color}
+					disabled={!hasData}
 					onchange={(c) => (receiverLight = { ...receiverLight, color: c })}
 				/>
 				<RangeField
@@ -287,6 +298,7 @@
 					min={0}
 					max={9}
 					value={receiverLight.speed}
+					disabled={!hasData}
 					onchange={(v) => (receiverLight = { ...receiverLight, speed: v })}
 				/>
 				<RangeField
@@ -294,6 +306,7 @@
 					min={0}
 					max={9}
 					value={receiverLight.brightness}
+					disabled={!hasData}
 					onchange={(v) => (receiverLight = { ...receiverLight, brightness: v })}
 				/>
 				<RangeField
@@ -302,9 +315,14 @@
 					min={0}
 					max={255}
 					value={receiverLight.time}
+					disabled={!hasData}
 					onchange={(v) => (receiverLight = { ...receiverLight, time: v })}
 				/>
-				<button class="btn btn-primary" disabled={receiverSaving} onclick={applyReceiverLight}>
+				<button
+					class="btn btn-primary"
+					disabled={!hasData || receiverSaving}
+					onclick={applyReceiverLight}
+				>
 					{receiverSaving ? 'Applying...' : 'Apply receiver light'}
 				</button>
 			</div>
@@ -322,7 +340,7 @@
 					<div class="field-hint">{pairingStatusText}</div>
 				{/if}
 			</div>
-			<button class="btn" disabled={pairing} onclick={startPairing}>
+			<button class="btn" disabled={!hasData || pairing} onclick={startPairing}>
 				{pairing ? 'Starting...' : 'Start pairing'}
 			</button>
 		</div>
@@ -340,7 +358,13 @@
 					<button class="btn" onclick={() => (confirmingReset = false)}>Cancel</button>
 				</div>
 			{:else}
-				<button class="btn btn-danger" onclick={() => (confirmingReset = true)}>Factory reset</button>
+				<button
+					class="btn btn-danger"
+					disabled={!hasData}
+					onclick={() => (confirmingReset = true)}
+				>
+					Factory reset
+				</button>
 			{/if}
 		</div>
 		{#if device.lastError}
@@ -385,5 +409,13 @@
 
 	.error-text {
 		color: var(--danger);
+	}
+
+	/* A short caption noting why a panel's controls are disabled, not a placeholder replacing
+	   them: the controls themselves stay rendered (see BLANK_SETTINGS in ../types.ts). */
+	.caption-note {
+		display: block;
+		margin-top: 2px;
+		color: var(--text-faint);
 	}
 </style>

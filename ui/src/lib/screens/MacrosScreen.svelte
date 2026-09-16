@@ -284,6 +284,10 @@
 		flex-direction: column;
 		gap: 6px;
 		margin-bottom: 12px;
+		/* A safety net, not the primary fix (that is `.layout` stacking below): this table's
+		   columns have a real minimum width, so if it is ever squeezed narrower than that, it
+		   scrolls within its own box instead of forcing the whole page to scroll sideways. */
+		overflow-x: auto;
 	}
 
 	.event-head,
@@ -292,6 +296,7 @@
 		grid-template-columns: 22px 110px 130px 90px 90px 1fr;
 		gap: 8px;
 		align-items: center;
+		min-width: 560px;
 	}
 
 	.event-head {
@@ -320,5 +325,17 @@
 
 	.error-text {
 		color: var(--danger);
+	}
+
+	/* Same breakpoint as the Buttons screen (see its own comment): the library list stacks above
+	   the editor instead of squeezing beside it. */
+	@media (max-width: 900px) {
+		.layout {
+			flex-direction: column;
+		}
+
+		.list-panel {
+			width: 100%;
+		}
 	}
 </style>

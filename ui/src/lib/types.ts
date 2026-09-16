@@ -250,6 +250,40 @@ export interface Settings {
 	profile: Profile;
 }
 
+/// A structurally complete `Settings` shape used only to keep every screen's controls mounted
+/// (and disabled) before a device has ever been read, so the interface never falls back to a
+/// "no device" / "reading settings" placeholder in place of its real controls. No field here is
+/// ever shown to the user: every screen that renders from this constant also passes `unknown`
+/// (or `disabled`) to the control displaying it, which renders an em dash instead of the number
+/// below, per the same honesty rule that forbids a fabricated DPI or brightness reading. Values
+/// are chosen so the *maximal* set of conditionally-shown controls is visible (a mode with both a
+/// color and a speed field, the performance timeout revealed, one DPI stage), matching "exactly
+/// as they appear when a device is connected" for a screen that shows every optional control.
+export const BLANK_SETTINGS: Settings = {
+	pollingHz: 1000,
+	dpiStages: [{ dpi: 800, color: [255, 255, 255] }],
+	currentStage: 0,
+	lod: { value: 'oneMillimeter' },
+	debounceMs: 0,
+	motionSync: false,
+	angleSnap: false,
+	ripple: false,
+	performance: { on: true, timeout: { value: 'tenSeconds' } },
+	sleep: { value: 'tenSeconds' },
+	lighting: {
+		mode: { mode: 'singleColorBreath' },
+		color: [255, 255, 255],
+		speed: 0,
+		brightness: 0,
+		on: false
+	},
+	buttons: [],
+	sensorMode: 0,
+	dpiIndicator: { mode: { mode: 'steady' }, brightness: 1, speed: 0, on: false },
+	longRange: 'off',
+	profile: { state: 'active', index: 0 }
+};
+
 export type Modifier =
 	| 'leftCtrl'
 	| 'leftShift'

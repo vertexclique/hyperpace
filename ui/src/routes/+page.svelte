@@ -45,14 +45,20 @@
 </div>
 
 <style>
+	/* Fixed viewport height with the sidebar pinned; only `.content` scrolls, so a tall screen
+	   never drags the sidebar out of view or grows the window past its own bounds (the window
+	   never resizes to fit content; content fits, or scrolls, inside it). */
 	.shell {
 		display: flex;
-		min-height: 100vh;
+		height: 100vh;
+		overflow: hidden;
 	}
 
 	.content {
 		flex: 1;
 		min-width: 0;
+		height: 100vh;
+		overflow-y: auto;
 		overflow-x: hidden;
 	}
 </style>

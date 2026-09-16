@@ -289,9 +289,10 @@ Thank you for your help.`;
 
 	.firmware-row {
 		display: flex;
+		flex-wrap: wrap;
 		justify-content: space-between;
 		align-items: center;
-		gap: 12px;
+		gap: 8px 12px;
 		background: var(--bg-raised);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);

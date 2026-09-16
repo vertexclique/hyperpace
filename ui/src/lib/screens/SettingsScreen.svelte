@@ -1,13 +1,26 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { device, isTauriShell } from '../device.svelte';
+	import { DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT } from '../types';
 	import type { AppSettings, DeviceBackend, LinkType } from '../types';
 	import EmptyState from '../components/EmptyState.svelte';
 	import Toggle from '../components/Toggle.svelte';
 	import RangeField from '../components/RangeField.svelte';
 
+	// The app's own fallback when a preference has never been written (matches
+	// `extractAppSettings` in device.svelte.ts and the Rust side's own defaults), not a device
+	// reading: these preferences exist independent of any device, so there is nothing dishonest
+	// about showing them immediately instead of behind a "Loading..." placeholder while the
+	// near-instant local-store round trip completes.
+	const DEFAULT_APP_SETTINGS: AppSettings = {
+		autostart: false,
+		lowBatteryThresholdPercent: DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT,
+		minimizeToTray: false,
+		firmwareWatchEnabled: true
+	};
+
 	let connectingBackend = $state<DeviceBackend | null>(null);
-	let appDraft = $state<AppSettings | null>(null);
+	let appDraft = $state<AppSettings>({ ...DEFAULT_APP_SETTINGS });
 	let appDirty = $state(false);
 	let appSaving = $state(false);
 	let profileIndex = $state(0);
@@ -15,6 +28,7 @@
 	let exporting = $state(false);
 	let importing = $state(false);
 	let configFileInput = $state<HTMLInputElement | null>(null);
+	let hasData = $derived(device.settings !== null);
 
 	onMount(() => {
 		void device.refreshDevices();
@@ -22,7 +36,7 @@
 	});
 
 	$effect(() => {
-		appDraft = device.appSettings ? { ...device.appSettings } : null;
+		appDraft = device.appSettings ? { ...device.appSettings } : { ...DEFAULT_APP_SETTINGS };
 		appDirty = false;
 	});
 
@@ -157,29 +171,38 @@
 
 	<section class="panel">
 		<div class="panel-title">Profile</div>
-		<div class="panel-subtitle">Switch the device's active on-board profile.</div>
-		{#if !device.connected}
-			<EmptyState title="No device connected" message="Connect a mouse to read and switch its profile." />
-		{:else if device.settingsLoading || !device.settings}
-			<EmptyState title="Reading settings" message="Fetching the active profile from the device." />
-		{:else if device.settings.profile.state === 'unsupported'}
-			<p class="field-hint">Profile switching is not supported on this device.</p>
-		{:else}
-			<div class="field-row">
-				<input
-					class="text-input"
-					type="number"
-					min="0"
-					max="7"
-					style="width:80px"
-					bind:value={profileIndex}
-				/>
-				<button class="btn btn-primary" disabled={profileSaving} onclick={switchProfile}>
-					{profileSaving ? 'Switching...' : 'Switch profile'}
-				</button>
-			</div>
-			<p class="field-hint">Currently profile {device.settings.profile.index}.</p>
-		{/if}
+		<div class="panel-subtitle">
+			Switch the device's active on-board profile.
+			{#if !hasData}
+				<span class="caption-note">No device connected.</span>
+			{:else if device.settings?.profile.state === 'unsupported'}
+				<span class="caption-note">Not supported on this device.</span>
+			{/if}
+		</div>
+		<div class="field-row">
+			<input
+				class="text-input"
+				type="number"
+				min="0"
+				max="7"
+				style="width:80px"
+				disabled={!hasData || device.settings?.profile.state === 'unsupported'}
+				value={hasData ? profileIndex : ''}
+				oninput={(e) => (profileIndex = Number((e.target as HTMLInputElement).value))}
+			/>
+			<button
+				class="btn btn-primary"
+				disabled={!hasData || device.settings?.profile.state === 'unsupported' || profileSaving}
+				onclick={switchProfile}
+			>
+				{profileSaving ? 'Switching...' : 'Switch profile'}
+			</button>
+		</div>
+		<p class="field-hint">
+			{hasData && device.settings?.profile.state === 'active'
+				? `Currently profile ${device.settings.profile.index}.`
+				: 'Currently: -'}
+		</p>
 	</section>
 
 	<section class="panel">
@@ -208,54 +231,61 @@
 
 	<section class="panel">
 		<div class="panel-title">App preferences</div>
-		<div class="panel-subtitle">Behaviour of the Hyperpace app itself, independent of any device.</div>
-		{#if !appDraft}
-			<p class="field-hint">
-				{isTauriShell ? 'Loading...' : 'Not available in preview mode.'}
-			</p>
-		{:else}
-			<div class="field-stack">
-				<Toggle
-					label="Launch at login"
-					checked={appDraft.autostart}
-					onchange={(v) => {
-						if (appDraft) appDraft.autostart = v;
-						appDirty = true;
-					}}
-				/>
-				<Toggle
-					label="Minimize to tray on close"
-					checked={appDraft.minimizeToTray}
-					onchange={(v) => {
-						if (appDraft) appDraft.minimizeToTray = v;
-						appDirty = true;
-					}}
-				/>
-				<Toggle
-					label="Watch for firmware publication"
-					hint="Checks the vendor's own config files and firmware directory paths at app start and periodically; never downloads or installs anything."
-					checked={appDraft.firmwareWatchEnabled}
-					onchange={(v) => {
-						if (appDraft) appDraft.firmwareWatchEnabled = v;
-						appDirty = true;
-					}}
-				/>
-				<RangeField
-					label="Low battery warning"
-					unit="%"
-					min={5}
-					max={50}
-					value={appDraft.lowBatteryThresholdPercent}
-					onchange={(v) => {
-						if (appDraft) appDraft.lowBatteryThresholdPercent = v;
-						appDirty = true;
-					}}
-				/>
-				<button class="btn btn-primary" disabled={!appDirty || appSaving} onclick={saveAppSettings}>
-					{appSaving ? 'Saving...' : appDirty ? 'Save preferences' : 'Up to date'}
-				</button>
-			</div>
-		{/if}
+		<div class="panel-subtitle">
+			Behaviour of the Hyperpace app itself, independent of any device.
+			{#if !isTauriShell}
+				<span class="caption-note">Not available in preview mode.</span>
+			{/if}
+		</div>
+		<div class="field-stack">
+			<Toggle
+				label="Launch at login"
+				checked={appDraft.autostart}
+				disabled={!isTauriShell}
+				onchange={(v) => {
+					appDraft.autostart = v;
+					appDirty = true;
+				}}
+			/>
+			<Toggle
+				label="Minimize to tray on close"
+				checked={appDraft.minimizeToTray}
+				disabled={!isTauriShell}
+				onchange={(v) => {
+					appDraft.minimizeToTray = v;
+					appDirty = true;
+				}}
+			/>
+			<Toggle
+				label="Watch for firmware publication"
+				hint="Checks the vendor's own config files and firmware directory paths at app start and periodically; never downloads or installs anything."
+				checked={appDraft.firmwareWatchEnabled}
+				disabled={!isTauriShell}
+				onchange={(v) => {
+					appDraft.firmwareWatchEnabled = v;
+					appDirty = true;
+				}}
+			/>
+			<RangeField
+				label="Low battery warning"
+				unit="%"
+				min={5}
+				max={50}
+				value={appDraft.lowBatteryThresholdPercent}
+				disabled={!isTauriShell}
+				onchange={(v) => {
+					appDraft.lowBatteryThresholdPercent = v;
+					appDirty = true;
+				}}
+			/>
+			<button
+				class="btn btn-primary"
+				disabled={!isTauriShell || !appDirty || appSaving}
+				onclick={saveAppSettings}
+			>
+				{appSaving ? 'Saving...' : appDirty ? 'Save preferences' : 'Up to date'}
+			</button>
+		</div>
 	</section>
 </div>
 
@@ -297,5 +327,9 @@
 
 	.error-text {
 		color: var(--danger);
+	}
+
+	.caption-note {
+		color: var(--text-faint);
 	}
 </style>

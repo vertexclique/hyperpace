@@ -79,6 +79,28 @@ sudo udevadm trigger --subsystem-match=hidraw
 Unplug and replug the mouse (or the receiver) afterwards if the app was
 already running when you installed the rule.
 
+### Blank window on NVIDIA (Wayland or X11)
+
+WebKitGTK's DMABUF renderer can produce a completely blank window on an
+NVIDIA GPU (see
+`docs/papers/hyperpace-firmware-platform/summaries/SUMMARY-tauri-2026-linux-graphics-docs.md`).
+Hyperpace detects this itself: at startup, before the window is created, it
+checks for a Linux Wayland or X11 session with an NVIDIA GPU present (the
+DRM device vendor id under `/sys/class/drm`, or the `nvidia` kernel module
+loaded) and, only then, sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` for itself.
+The decision is logged once at startup (`RUST_LOG=info`, the default) so it
+is visible which case applied.
+
+If you already export `WEBKIT_DISABLE_DMABUF_RENDERER` yourself, Hyperpace
+leaves it alone. Two escape hatches force the behaviour either way,
+independent of detection:
+
+- Environment variable `HYPERPACE_DMABUF_WORKAROUND=on` (always apply) or
+  `=off` (never apply); `=auto` or unset restores detection.
+- App setting `gpu_dmabuf_workaround`, same three values (`on` / `off` /
+  `auto`), read through the existing `app_settings` command/store. The
+  environment variable wins when both are set.
+
 ## Firmware
 
 **No firmware package is bundled**, and the in-app firmware screen says so

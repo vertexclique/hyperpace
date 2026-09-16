@@ -5,10 +5,20 @@
 		color: RgbColor;
 		label?: string;
 		disabled?: boolean;
+		/** No real reading exists yet (no device connected, or its settings have not been read).
+		 * Shows an em dash and a neutral gray swatch instead of `color`, never a plausible-looking
+		 * hex value, and forces `disabled`. */
+		unknown?: boolean;
 		onchange?: (color: RgbColor) => void;
 	}
 
-	let { color = $bindable([255, 255, 255]), label, disabled = false, onchange }: Props = $props();
+	let {
+		color = $bindable([255, 255, 255]),
+		label,
+		disabled = false,
+		unknown = false,
+		onchange
+	}: Props = $props();
 
 	function toHex(c: RgbColor): string {
 		const part = (n: number) => n.toString(16).padStart(2, '0');
@@ -30,12 +40,12 @@
 	<div class="swatch-row">
 		<input
 			type="color"
-			{disabled}
-			value={toHex(color)}
+			disabled={disabled || unknown}
+			value={unknown ? '#808080' : toHex(color)}
 			oninput={handleInput}
 			aria-label={label ?? 'Color'}
 		/>
-		<span class="field-hint">{toHex(color)}</span>
+		<span class="field-hint">{unknown ? '-' : toHex(color)}</span>
 	</div>
 </div>
 

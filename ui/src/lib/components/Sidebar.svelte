@@ -40,6 +40,7 @@
 					class:active={active === item.id}
 					onclick={() => onselect(item.id)}
 					aria-current={active === item.id ? 'page' : undefined}
+					title={item.label}
 				>
 					<Icon name={item.id} />
 					<span>{item.label}</span>
@@ -63,7 +64,7 @@
 		background: var(--bg-raised);
 		border-right: 1px solid var(--border);
 		padding: 16px 12px;
-		height: 100vh;
+		height: 100%;
 	}
 
 	.brand {
@@ -120,5 +121,40 @@
 		gap: 8px;
 		padding-top: 12px;
 		border-top: 1px solid var(--border-soft);
+	}
+
+	/* Below the window's minimum width, the sidebar collapses to icons instead of eating into
+	   the content area: labels and badge text disappear (via font-size, so a child component's
+	   own icon glyphs, sized in px rather than em, stay visible), the nav column narrows and its
+	   buttons center their icon. */
+	@media (max-width: 900px) {
+		.sidebar {
+			width: 60px;
+			padding: 16px 8px;
+		}
+
+		.brand-name {
+			display: none;
+		}
+
+		.nav-item {
+			justify-content: center;
+			padding: 9px;
+		}
+
+		.nav-item span:last-child {
+			display: none;
+		}
+
+		.sidebar-footer {
+			align-items: center;
+		}
+
+		.sidebar-footer :global(.tag) {
+			font-size: 0;
+			padding: 4px;
+			justify-content: center;
+			gap: 0;
+		}
 	}
 </style>

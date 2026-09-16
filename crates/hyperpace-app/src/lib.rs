@@ -21,16 +21,21 @@
 //! - [`icon`]: renders the battery percentage into the tray icon's own pixels.
 //! - [`tray`]: builds the tray icon and its menu, and updates them as the device state changes.
 //! - [`window`]: the main window's lifecycle, including hide-to-tray with the webview destroyed.
+//! - [`gpu_workaround`]: the Linux WebKitGTK/NVIDIA DMABUF blank-window workaround, applied before
+//!   the webview exists.
 //! - [`commands`]: every Tauri command in the API contract.
 
 pub mod blocking;
 pub mod commands;
 pub mod dto;
 pub mod error;
+pub mod gpu_workaround;
 pub mod icon;
 pub mod state;
 pub mod tray;
 pub mod window;
+
+use std::path::Path;
 
 use hyperpace_store::Store;
 use tauri::Manager;
@@ -69,6 +74,15 @@ fn init_logging() {
 pub fn run() -> Result<(), AppError> {
     init_logging();
 
+    // Must run before `tauri::Builder` (before the webview exists): see `gpu_workaround`'s own
+    // doc comment for why this needs a short-lived store handle of its own (read then dropped
+    // here) rather than reusing the one opened below, and for why a re-exec, not
+    // `std::env::set_var`, is how it changes this process's environment. The closure defers that
+    // read until `gpu_workaround::apply` actually needs it (most startups never do: the
+    // environment variable or an already-set `WEBKIT_DISABLE_DMABUF_RENDERER` settles it first).
+    let store_root = Store::default_root()?;
+    gpu_workaround::apply(|| read_gpu_workaround_setting(&store_root));
+
     // `commands::firmware_watch`'s HTTP client depends on reqwest's "rustls-no-provider" feature
     // (its own default feature pulls in an aws-lc-sys native build step nothing else in this
     // workspace needs), which requires the app to install a process-wide default crypto provider
@@ -76,7 +90,6 @@ pub fn run() -> Result<(), AppError> {
     // safe to ignore; nothing else in this process installs one.
     let _ = rustls::crypto::ring::default_provider().install_default();
 
-    let store_root = Store::default_root()?;
     let store = Store::open(&store_root)?;
 
     let app = tauri::Builder::default()
@@ -132,4 +145,28 @@ pub fn run() -> Result<(), AppError> {
 
     app.run(|_app_handle, _event| {});
     Ok(())
+}
+
+/// Reads the [`gpu_workaround::APP_SETTING_KEY`] app setting through a store handle opened and
+/// dropped entirely within this function, before `run` opens the store it actually uses for the
+/// rest of the app's lifetime.
+///
+/// This has to be a separate, short-lived open rather than reusing `run`'s own `store`: applying
+/// the workaround can re-execute this process (see `gpu_workaround`'s doc comment), and the
+/// embedded store node holds an exclusive lock on `store_root` for as long as a `Store` handle to
+/// it is alive. Re-executing while that handle was still open would carry the lock into the new
+/// process image with nothing left in the old one to release it, deadlocking the new process's
+/// own `Store::open`. Never fails loudly: an unreadable or not-yet-created store on first launch
+/// just means no override is configured yet, which is `None`, the same as an override that was
+/// never set.
+fn read_gpu_workaround_setting(store_root: &Path) -> Option<String> {
+    let store = Store::open(store_root).ok()?;
+    store
+        .settings()
+        .list()
+        .ok()?
+        .into_iter()
+        .find(|(_, setting)| setting.key == gpu_workaround::APP_SETTING_KEY)
+        .and_then(|(_, setting)| setting.value.as_str().map(str::to_owned))
+    // `store` drops here, closing the embedded node before `gpu_workaround::apply` can re-exec.
 }

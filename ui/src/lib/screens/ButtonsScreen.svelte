@@ -2,7 +2,6 @@
 	import { device } from '../device.svelte';
 	import type { ButtonAction, Keystroke, MacroCycles, Modifier } from '../types';
 	import MouseArt from '../art/MouseArt.svelte';
-	import EmptyState from '../components/EmptyState.svelte';
 	import SelectField from '../components/SelectField.svelte';
 	import RangeField from '../components/RangeField.svelte';
 
@@ -113,7 +112,7 @@
 	];
 
 	let selected = $state<number | null>(null);
-	let draft = $state<ButtonAction | null>(null);
+	let draft = $state<ButtonAction>({ type: 'disabled' });
 	let saving = $state(false);
 
 	// The keystroke slot at the selected button's index (docs/research/mouse-protocol-v2.md
@@ -122,15 +121,30 @@
 	let keystrokeDraft = $state<Keystroke>({ ...EMPTY_KEYSTROKE });
 	let keystrokeLoaded = $state(false);
 
+	// `hasData` mirrors the other screens' own flag (see LightingScreen): true once this device's
+	// settings, buttons included, have actually been read.
+	let hasData = $derived(device.settings !== null);
 	let buttons = $derived(device.settings?.buttons ?? []);
 	let selectedAction = $derived(selected !== null ? (buttons[selected] ?? null) : null);
 
+	// `draft` is never null: with no real assignment to show (no device, or a button index past
+	// what this device reported), it falls back to the same structural "disabled" default every
+	// unassigned button already displays with a device connected, and the Action select below
+	// marks itself `unknown` in that case so "Disabled" is never shown as if it were a reading.
 	$effect(() => {
-		draft = selectedAction ? structuredClone(selectedAction) : null;
+		draft = selectedAction ? structuredClone(selectedAction) : defaultForKind('disabled');
 	});
 
 	async function loadKeystroke(index: number) {
 		keystrokeLoaded = false;
+		// No device, nothing to read: skip the round trip entirely rather than calling a command
+		// that can only fail with "no device connected", which would surface as an error for a
+		// state that is normal, not a failure.
+		if (!device.connected) {
+			keystrokeDraft = { ...EMPTY_KEYSTROKE };
+			keystrokeLoaded = true;
+			return;
+		}
 		const keystroke = await device.getButtonKeystroke(index);
 		keystrokeDraft = keystroke ?? { ...EMPTY_KEYSTROKE };
 		keystrokeLoaded = true;
@@ -154,7 +168,6 @@
 	}
 
 	function setKind(type: ButtonAction['type']) {
-		if (!draft) return;
 		draft = defaultForKind(type);
 	}
 
@@ -184,7 +197,7 @@
 	}
 
 	function setCyclesKind(cycles: MacroCycles['cycles']) {
-		if (!draft || draft.type !== 'macro') return;
+		if (draft.type !== 'macro') return;
 		draft = {
 			...draft,
 			cycles: cycles === 'times' ? { cycles: 'times', n: 1 } : { cycles }
@@ -192,7 +205,7 @@
 	}
 
 	async function apply() {
-		if (selected === null || !draft) return;
+		if (selected === null || !hasData) return;
 		saving = true;
 		try {
 			let keystroke: Keystroke | undefined;
@@ -246,38 +259,41 @@
 	</div>
 
 	<div class="content-column">
-		{#if !device.connected}
-			<EmptyState
-				title="No device connected"
-				message="Connect a Hyperpace mouse from Settings to read and edit its button assignments."
-			/>
-		{:else if device.settingsLoading}
-			<EmptyState title="Reading settings" message="Fetching the current button layout from the device." />
-		{:else if selected === null}
+		{#if selected === null}
 			<div class="panel">
 				<div class="panel-title">Buttons</div>
-				<div class="panel-subtitle">{buttons.length} button{buttons.length === 1 ? '' : 's'} reported by this device.</div>
+				<div class="panel-subtitle">
+					{#if hasData}
+						{buttons.length} button{buttons.length === 1 ? '' : 's'} reported by this device.
+					{:else}
+						{BUTTON_LABELS.length} buttons (default layout).
+						<span class="caption-note">No device connected.</span>
+					{/if}
+				</div>
 				<ul class="button-list">
-					{#each buttons as action, i (i)}
+					{#each Array.from({ length: hasData ? buttons.length : BUTTON_LABELS.length }) as _, i (i)}
 						<li>
 							<button type="button" class="list-row" onclick={() => selectHotspot(i)}>
 								<span>{BUTTON_LABELS[i] ?? `Button ${i + 1}`}</span>
-								<span class="field-hint">{actionSummary(action)}</span>
+								<span class="field-hint">{hasData ? actionSummary(buttons[i]) : '-'}</span>
 							</button>
 						</li>
 					{/each}
 				</ul>
 			</div>
-		{:else if draft}
+		{:else}
 			<div class="panel">
 				<div class="panel-title">{BUTTON_LABELS[selected] ?? `Button ${selected + 1}`}</div>
-				<div class="panel-subtitle">Currently: {selectedAction ? actionSummary(selectedAction) : 'unknown'}</div>
+				<div class="panel-subtitle">
+					Currently: {hasData && selectedAction ? actionSummary(selectedAction) : '-'}
+				</div>
 
 				<div class="grid" style="gap: 14px">
 					<SelectField
 						label="Action"
 						value={draft.type}
 						options={ASSIGNABLE_KINDS}
+						unknown={!hasData}
 						onchange={(k) => setKind(k)}
 					/>
 
@@ -292,6 +308,7 @@
 								{ value: 'backward', label: 'Backward' },
 								{ value: 'forward', label: 'Forward' }
 							]}
+							disabled={!hasData}
 							onchange={(v) => draft && draft.type === 'mouse' && (draft.button = v)}
 						/>
 					{:else if draft.type === 'dpi'}
@@ -303,6 +320,7 @@
 								{ value: 'increase', label: 'DPI +' },
 								{ value: 'decrease', label: 'DPI -' }
 							]}
+							disabled={!hasData}
 							onchange={(v) => draft && draft.type === 'dpi' && (draft.action = v)}
 						/>
 					{:else if draft.type === 'scroll'}
@@ -313,6 +331,7 @@
 								{ value: 'left', label: 'Scroll left' },
 								{ value: 'right', label: 'Scroll right' }
 							]}
+							disabled={!hasData}
 							onchange={(v) => draft && draft.type === 'scroll' && (draft.direction = v)}
 						/>
 					{:else if draft.type === 'fire'}
@@ -322,6 +341,7 @@
 							min={0}
 							max={3}
 							value={draft.times}
+							disabled={!hasData}
 							onchange={(v) => draft && draft.type === 'fire' && (draft.times = v)}
 						/>
 						<RangeField
@@ -330,6 +350,7 @@
 							min={10}
 							max={255}
 							value={draft.intervalMs}
+							disabled={!hasData}
 							onchange={(v) => draft && draft.type === 'fire' && (draft.intervalMs = v)}
 						/>
 					{:else if draft.type === 'keystroke'}
@@ -340,6 +361,7 @@
 									<input
 										type="checkbox"
 										checked={keystrokeDraft.modifiers.includes(mod.value)}
+										disabled={!hasData}
 										onchange={(e) =>
 											toggleModifier(mod.value, (e.target as HTMLInputElement).checked)}
 									/>
@@ -351,6 +373,7 @@
 							label="Key"
 							value={keystrokeDraft.key ?? -1}
 							options={[{ value: -1, label: 'None' }, ...KEY_OPTIONS]}
+							disabled={!hasData}
 							onchange={(v) => (keystrokeDraft = { ...keystrokeDraft, key: v === -1 ? null : v })}
 						/>
 						<p class="field-hint">
@@ -364,6 +387,7 @@
 							min={0}
 							max={31}
 							value={draft.slot}
+							disabled={!hasData}
 							onchange={(v) => draft && draft.type === 'macro' && (draft.slot = v)}
 						/>
 						<SelectField
@@ -374,6 +398,7 @@
 								{ value: 'untilReleased', label: 'Until the button is released' },
 								{ value: 'untilAnyPress', label: 'Until any button is pressed' }
 							]}
+							disabled={!hasData}
 							onchange={(v) => setCyclesKind(v)}
 						/>
 						{#if draft.cycles.cycles === 'times'}
@@ -382,6 +407,7 @@
 								min={1}
 								max={250}
 								value={draft.cycles.n}
+								disabled={!hasData}
 								onchange={(v) =>
 									draft &&
 									draft.type === 'macro' &&
@@ -394,13 +420,14 @@
 							label="Media key"
 							value={draft.usage}
 							options={MEDIA_KEYS.map((m) => ({ value: m.usage, label: m.label }))}
+							disabled={!hasData}
 							onchange={(v) => draft && draft.type === 'media' && (draft.usage = v)}
 						/>
 					{/if}
 				</div>
 
 				<div class="actions-row">
-					<button class="btn btn-primary" disabled={saving} onclick={apply}>
+					<button class="btn btn-primary" disabled={!hasData || saving} onclick={apply}>
 						{saving ? 'Applying...' : 'Apply'}
 					</button>
 					<button class="btn" onclick={() => (selected = null)}>Back to list</button>
@@ -490,5 +517,23 @@
 		gap: 6px;
 		font-size: 12.5px;
 		color: var(--text-faint);
+	}
+
+	.caption-note {
+		color: var(--text-faint);
+	}
+
+	/* Below the window's minimum width, stack the mouse art above the button list/editor instead
+	   of squeezing both into one row; the art column drops its sticky offset since it is no
+	   longer beside a taller sibling to stay level with. */
+	@media (max-width: 900px) {
+		.layout {
+			flex-direction: column;
+		}
+
+		.art-column {
+			width: 100%;
+			position: static;
+		}
 	}
 </style>

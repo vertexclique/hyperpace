@@ -28,11 +28,20 @@ pub fn show_main_window(app: &AppHandle) -> tauri::Result<()> {
         return Ok(());
     }
 
+    // 1180x940: at this size every screen's dense panel grid (Lighting and receiver's three
+    // panels above all, the tallest: mouse lighting, the DPI indicator and the receiver,
+    // including its pairing and factory-reset rows) renders in full with no scrollbar for its
+    // own content; see the responsive rules in `ui/src/app.css` and each screen's own styles.
+    // 900x620 is the minimum the same layout genuinely supports without a horizontal scrollbar
+    // or a clipped control: below it the sidebar collapses to icons and the two-column screens
+    // (Buttons, Macros) stack instead of squeezing side by side (docs/decs/hyperpace_DECS.md).
+    // A window shorter than the default, minimum included, scrolls each screen's own content
+    // region rather than clipping it (`.content`'s `overflow-y: auto`).
     let window =
         WebviewWindowBuilder::new(app, MAIN_WINDOW_LABEL, WebviewUrl::App("index.html".into()))
             .title("Hyperpace")
-            .inner_size(960.0, 640.0)
-            .min_inner_size(640.0, 480.0)
+            .inner_size(1180.0, 940.0)
+            .min_inner_size(900.0, 620.0)
             .build()?;
     wire_close_to_tray(&window);
     Ok(())

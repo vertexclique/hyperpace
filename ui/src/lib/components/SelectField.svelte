@@ -10,6 +10,10 @@
 		hint?: string;
 		options: Option[];
 		disabled?: boolean;
+		/** No real reading exists yet (no device connected, or its settings have not been read).
+		 * Renders a disabled select offering only an em dash, never one of `options` pre-selected
+		 * as if it were a real reading. */
+		unknown?: boolean;
 		/** Keep the label for screen readers, but don't render it visibly (e.g. inside a table with column headers). */
 		hideLabel?: boolean;
 		onchange?: (value: T) => void;
@@ -21,6 +25,7 @@
 		hint,
 		options,
 		disabled = false,
+		unknown = false,
 		hideLabel = false,
 		onchange
 	}: Props = $props();
@@ -42,11 +47,17 @@
 <div class="field">
 	<label class="field-label" class:sr-only={hideLabel} for={uid}>{label}</label>
 	{#if hint}<div class="field-hint">{hint}</div>{/if}
-	<select id={uid} {disabled} value={String(value)} onchange={handleChange}>
-		{#each options as option (option.value)}
-			<option value={String(option.value)}>{option.label}</option>
-		{/each}
-	</select>
+	{#if unknown}
+		<select id={uid} disabled value="unknown">
+			<option value="unknown">{'-'}</option>
+		</select>
+	{:else}
+		<select id={uid} {disabled} value={String(value)} onchange={handleChange}>
+			{#each options as option (option.value)}
+				<option value={String(option.value)}>{option.label}</option>
+			{/each}
+		</select>
+	{/if}
 </div>
 
 <style>

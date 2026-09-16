@@ -8,6 +8,11 @@
 		step?: number;
 		unit?: string;
 		disabled?: boolean;
+		/** No real reading exists yet (no device connected, or its settings have not been read).
+		 * Shows an em dash instead of `value`/`unit`, never a plausible-looking number, and forces
+		 * `disabled`. The slider itself still needs a numeric `value` to render (an HTML
+		 * requirement); it is never shown, since the label text is what the user reads. */
+		unknown?: boolean;
 		onchange?: (value: number) => void;
 	}
 
@@ -20,6 +25,7 @@
 		step = 1,
 		unit = '',
 		disabled = false,
+		unknown = false,
 		onchange
 	}: Props = $props();
 
@@ -37,7 +43,7 @@
 <div class="field">
 	<div class="field-row">
 		<label class="field-label" for={uid}>{label}</label>
-		<span class="range-value">{value}{unit}</span>
+		<span class="range-value">{unknown ? '-' : `${value}${unit}`}</span>
 	</div>
 	{#if hint}<div class="field-hint">{hint}</div>{/if}
 	<input
@@ -46,8 +52,8 @@
 		{min}
 		{max}
 		{step}
-		{disabled}
-		value={String(value)}
+		disabled={disabled || unknown}
+		value={String(unknown ? min : value)}
 		oninput={(e) => commit(Number((e.target as HTMLInputElement).value))}
 	/>
 </div>
