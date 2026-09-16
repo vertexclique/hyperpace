@@ -1,4 +1,7 @@
 <script lang="ts">
+	import HelpTip from './HelpTip.svelte';
+	import type { HelpKey } from '../help';
+
 	interface Props {
 		value: number;
 		label: string;
@@ -13,6 +16,9 @@
 		 * `disabled`. The slider itself still needs a numeric `value` to render (an HTML
 		 * requirement); it is never shown, since the label text is what the user reads. */
 		unknown?: boolean;
+		/** Shows a "?" beside the label explaining what this field does (see help.ts). Omitted
+		 * fields show no tip. */
+		helpTopic?: HelpKey;
 		onchange?: (value: number) => void;
 	}
 
@@ -26,6 +32,7 @@
 		unit = '',
 		disabled = false,
 		unknown = false,
+		helpTopic,
 		onchange
 	}: Props = $props();
 
@@ -42,7 +49,7 @@
 
 <div class="field">
 	<div class="field-row">
-		<label class="field-label" for={uid}>{label}</label>
+		<label class="field-label" for={uid}>{label}{#if helpTopic}<HelpTip topic={helpTopic} />{/if}</label>
 		<span class="range-value mono" class:unknown>{unknown ? '-' : `${value}${unit}`}</span>
 	</div>
 	{#if hint}<div class="field-hint">{hint}</div>{/if}

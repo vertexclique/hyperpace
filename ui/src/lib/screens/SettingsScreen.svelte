@@ -7,6 +7,7 @@
 	import { DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT } from '../types';
 	import type { AppSettings, AppSettingsResponse, DeviceBackend, LinkType } from '../types';
 	import EmptyState from '../components/EmptyState.svelte';
+	import HelpTip from '../components/HelpTip.svelte';
 	import Toggle from '../components/Toggle.svelte';
 	import RangeField from '../components/RangeField.svelte';
 	import SelectField from '../components/SelectField.svelte';
@@ -208,7 +209,7 @@
 <div class="page-pad grid settings-grid">
 	<section class="plate">
 		<div class="plate-head">
-			<h2 class="plate-title">Device</h2>
+			<h2 class="plate-title">Device<HelpTip topic="deviceConnection" /></h2>
 		</div>
 
 		{#if !isTauriShell}
@@ -279,7 +280,7 @@
 
 	<section class="plate">
 		<div class="plate-head">
-			<h2 class="plate-title">Profile</h2>
+			<h2 class="plate-title">Profile<HelpTip topic="profile" /></h2>
 		</div>
 		<p class="plate-subtitle">
 			Pick the device's active on-board profile.
@@ -317,7 +318,7 @@
 
 	<section class="plate">
 		<div class="plate-head">
-			<h2 class="plate-title">Configuration backup</h2>
+			<h2 class="plate-title">Configuration backup<HelpTip topic="configExport" /></h2>
 		</div>
 		<p class="plate-subtitle">Export or import the full settings shadow as a .bin file.</p>
 		<div class="field-row">
@@ -388,41 +389,59 @@
 		</p>
 		<div class="pref-list">
 			<div class="pref-row">
-				<Toggle
-					label="Launch at login"
-					checked={appDraft.autostart}
-					disabled={!isTauriShell}
-					onchange={(v) => {
-						appDraft.autostart = v;
-						appDirty = true;
-					}}
-				/>
+				<div class="tip-relabel">
+					<span class="field-label">Launch at login<HelpTip topic="launchAtLogin" /></span>
+					<div class="relabeled">
+						<Toggle
+							label="Launch at login"
+							checked={appDraft.autostart}
+							disabled={!isTauriShell}
+							onchange={(v) => {
+								appDraft.autostart = v;
+								appDirty = true;
+							}}
+						/>
+					</div>
+				</div>
 			</div>
 			<div class="pref-row">
-				<Toggle
-					label="Watch for firmware publication"
-					hint="Checks the vendor's own config files and firmware directory paths at app start and periodically; never downloads or installs anything."
-					checked={appDraft.firmwareWatchEnabled}
-					disabled={!isTauriShell}
-					onchange={(v) => {
-						appDraft.firmwareWatchEnabled = v;
-						appDirty = true;
-					}}
-				/>
+				<div class="tip-relabel">
+					<span class="field-label"
+						>Watch for firmware publication<HelpTip topic="firmwareWatch" /></span
+					>
+					<div class="relabeled">
+						<Toggle
+							label="Watch for firmware publication"
+							hint="Checks the vendor's own config files and firmware directory paths at app start and periodically; never downloads or installs anything."
+							checked={appDraft.firmwareWatchEnabled}
+							disabled={!isTauriShell}
+							onchange={(v) => {
+								appDraft.firmwareWatchEnabled = v;
+								appDirty = true;
+							}}
+						/>
+					</div>
+				</div>
 			</div>
 			<div class="pref-row">
-				<RangeField
-					label="Low battery warning"
-					unit="%"
-					min={5}
-					max={50}
-					value={appDraft.lowBatteryThresholdPercent}
-					disabled={!isTauriShell}
-					onchange={(v) => {
-						appDraft.lowBatteryThresholdPercent = v;
-						appDirty = true;
-					}}
-				/>
+				<div class="tip-relabel">
+					<span class="field-label">Low battery warning<HelpTip topic="lowBatteryWarning" /></span
+					>
+					<div class="relabeled relabeled-range">
+						<RangeField
+							label="Low battery warning"
+							unit="%"
+							min={5}
+							max={50}
+							value={appDraft.lowBatteryThresholdPercent}
+							disabled={!isTauriShell}
+							onchange={(v) => {
+								appDraft.lowBatteryThresholdPercent = v;
+								appDirty = true;
+							}}
+						/>
+					</div>
+				</div>
 			</div>
 		</div>
 		<button
@@ -436,8 +455,12 @@
 		<div class="rule"></div>
 
 		<div class="pref-row gpu-row">
+			<span class="field-label"
+				>Linux NVIDIA renderer workaround<HelpTip topic="rendererWorkaround" /></span
+			>
 			<SelectField
 				label="Linux NVIDIA renderer workaround"
+				hideLabel
 				hint="Works around a WebKitGTK blank-window bug on NVIDIA GPUs under Wayland or X11 (Linux only) by disabling its DMABUF renderer. Auto detects the failure condition at each launch. Takes effect on the next launch, not live."
 				options={GPU_WORKAROUND_OPTIONS}
 				value={gpuWorkaround}
@@ -498,6 +521,41 @@
 
 	.pref-row + .pref-row {
 		border-top: 1px solid var(--color-rule);
+	}
+
+	/* Toggle and RangeField render their own label inline with the control, so their built-in
+	   label has no slot for a HelpTip beside it (unlike SelectField's `hideLabel`). This renders
+	   the label ourselves, with the tip, and hides the control's own copy (sr-only, not
+	   display:none, so RangeField's real label-for association still names the slider for
+	   assistive tech); Toggle's copy carries no such association, its aria-label already covers
+	   it independently. */
+	.tip-relabel {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3xs);
+	}
+
+	.relabeled :global(.field-label) {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
+	}
+
+	/* RangeField's own label is itself the flex item that carries the value readout's
+	   space-between partner; absolute-positioning it removes it from the flex layout entirely
+	   (an absolutely positioned flex item takes no part in flex sizing), which would otherwise
+	   leave the value readout alone and pulled to the start instead of staying where it read
+	   before, at the end next to the slider below it. Toggle's own label is nested one level
+	   deeper (inside a wrapper that stays a flex item, hint text and all), so it needs no such
+	   correction. */
+	.relabeled-range :global(.field-row) {
+		justify-content: flex-end;
 	}
 
 	.save-btn {

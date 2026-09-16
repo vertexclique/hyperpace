@@ -4,6 +4,7 @@
 	import MouseArt from '../art/MouseArt.svelte';
 	import SelectField from '../components/SelectField.svelte';
 	import RangeField from '../components/RangeField.svelte';
+	import HelpTip from '../components/HelpTip.svelte';
 
 	const MODIFIER_OPTIONS: { value: Modifier; label: string }[] = [
 		{ value: 'leftCtrl', label: 'L Ctrl' },
@@ -271,7 +272,7 @@
 				<div class="plate-head">
 					<div class="plate-title-group">
 						<span class="plate-stub"></span>
-						<span class="plate-title">Buttons</span>
+						<span class="plate-title">Buttons<HelpTip topic="buttonBinding" /></span>
 					</div>
 				</div>
 				<p class="field-hint plate-subtitle">
@@ -326,6 +327,7 @@
 						value={draft.type}
 						options={ASSIGNABLE_KINDS}
 						unknown={!hasData}
+						helpTopic="buttonBinding"
 						onchange={(k) => setKind(k)}
 					/>
 
@@ -353,6 +355,7 @@
 								{ value: 'decrease', label: 'DPI -' }
 							]}
 							disabled={!hasData}
+							helpTopic="dpiSwitchAction"
 							onchange={(v) => draft && draft.type === 'dpi' && (draft.action = v)}
 						/>
 					{:else if draft.type === 'scroll'}
@@ -364,6 +367,7 @@
 								{ value: 'right', label: 'Scroll right' }
 							]}
 							disabled={!hasData}
+							helpTopic="scrollDirection"
 							onchange={(v) => draft && draft.type === 'scroll' && (draft.direction = v)}
 						/>
 					{:else if draft.type === 'fire'}
@@ -374,6 +378,7 @@
 							max={3}
 							value={draft.times}
 							disabled={!hasData}
+							helpTopic="fireKey"
 							onchange={(v) => draft && draft.type === 'fire' && (draft.times = v)}
 						/>
 						<RangeField
@@ -387,7 +392,7 @@
 						/>
 					{:else if draft.type === 'keystroke'}
 						<div class="field">
-							<span class="field-label">Modifiers</span>
+							<span class="field-label">Modifiers<HelpTip topic="keystroke" /></span>
 							<div class="modifier-grid">
 								{#each MODIFIER_OPTIONS as mod (mod.value)}
 									{@const pressed = keystrokeDraft.modifiers.includes(mod.value)}
@@ -423,6 +428,7 @@
 							max={31}
 							value={draft.slot}
 							disabled={!hasData}
+							helpTopic="macroSlot"
 							onchange={(v) => draft && draft.type === 'macro' && (draft.slot = v)}
 						/>
 						<SelectField
@@ -434,6 +440,7 @@
 								{ value: 'untilAnyPress', label: 'Until any button is pressed' }
 							]}
 							disabled={!hasData}
+							helpTopic="macroCycle"
 							onchange={(v) => setCyclesKind(v)}
 						/>
 						{#if draft.cycles.cycles === 'times'}
@@ -456,6 +463,7 @@
 							value={draft.usage}
 							options={MEDIA_KEYS.map((m) => ({ value: m.usage, label: m.label }))}
 							disabled={!hasData}
+							helpTopic="mediaKey"
 							onchange={(v) => draft && draft.type === 'media' && (draft.usage = v)}
 						/>
 					{/if}

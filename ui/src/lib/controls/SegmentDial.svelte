@@ -65,11 +65,12 @@
 	const RING_STROKE = 26;
 	// Close enough to the ring's own outer edge (RING_RADIUS + RING_STROKE / 2 = 95) that a
 	// segment's label reads as belonging to the dial rather than floating in the panel around it.
-	const LABEL_RADIUS = 106;
-	const POINTER_RADIUS = 5.5;
 	// The face bitmap is rendered at this radius, matching the ring's own outer edge, so the
 	// drawn segments sit right over the face's rim rather than floating past or short of it.
 	const FACE_RADIUS = RING_RADIUS + RING_STROKE / 2;
+	// Well clear of the ring: at a smaller gap the active segment's own arc and its label, both in
+	// the accent, read as one cyan blob (operator feedback with a screenshot, 2026-09-16).
+	const LABEL_RADIUS = FACE_RADIUS + 14;
 
 	let svgEl: SVGSVGElement | undefined = $state();
 	let dragIndex = $state<number | null>(null);
@@ -88,6 +89,11 @@
 	}
 
 	let effectiveDisabled = $derived(disabled || unknown);
+	// A centre readout (the big number, or the smaller one under `centerAction`'s button) already
+	// states the value once; highlighting the same value's ring label too read as the value
+	// printed twice (operator feedback, 2026-09-16). Sensor mode and lift-off carry no centre
+	// text at all, so their ring label stays the sole indicator and keeps the highlight.
+	let hasCenterText = $derived(centerLabel !== undefined);
 	let segmentAngle = $derived(360 / values.length);
 	let valueIndex = $derived(values.findIndex((option) => option.value === value));
 	let displayIndex = $derived(dragIndex ?? (valueIndex === -1 ? 0 : valueIndex));
@@ -99,6 +105,28 @@
 	let pointerWidth = $derived(faceInfo ? faceInfo.pointerWidth * faceScale : 0);
 	let pointerHeight = $derived(faceInfo ? faceInfo.pointerHeight * faceScale : 0);
 	let pointerBearing = $derived(displayIndex * segmentAngle);
+
+
+	/**
+	 * Where a label sits relative to its point on the label circle. A label centred on that point
+	 * reaches back over the ring by half its own width, which is what put the ring's arc through
+	 * "1 min" and "10 min" (operator feedback, 2026-09-16). Anchoring it away from the centre keeps
+	 * every label clear of the ring whatever its length.
+	 */
+	function labelAnchor(bearing: number): 'start' | 'middle' | 'end' {
+		const sin = Math.sin((bearing * Math.PI) / 180);
+		if (sin > 0.25) return 'start';
+		if (sin < -0.25) return 'end';
+		return 'middle';
+	}
+
+	/** The same idea vertically, so a label at the top or bottom clears the ring too. */
+	function labelBaseline(bearing: number): 'auto' | 'middle' | 'hanging' {
+		const cos = Math.cos((bearing * Math.PI) / 180);
+		if (cos > 0.5) return 'auto';
+		if (cos < -0.5) return 'hanging';
+		return 'middle';
+	}
 
 	function indexFromPoint(point: { clientX: number; clientY: number }): number {
 		if (!svgEl) return 0;
@@ -233,44 +261,50 @@
 		/>
 	{/each}
 
-	{#if !unknown}
-		{#if faceInfo}
-			<image
-				class="pointer-sprite"
-				href={faceInfo.pointerSrc}
-				x={CX - pointerWidth / 2}
-				y={CY - pointerHeight}
-				width={pointerWidth}
-				height={pointerHeight}
-				transform="rotate({pointerBearing} {CX} {CY})"
-				filter="url(#{uid}-ink)"
-				aria-hidden="true"
-			/>
-		{:else}
-			{@const p = pointOnCircle(CX, CY, RING_RADIUS, displayIndex * segmentAngle)}
-			<rect
-				class="pointer"
-				x={p.x - POINTER_RADIUS}
-				y={p.y - POINTER_RADIUS}
-				width={POINTER_RADIUS * 2}
-				height={POINTER_RADIUS * 2}
-			/>
-		{/if}
+	<!-- The vendor's own pointer sprite is the hardware's physical needle and stays; the plain
+	     vector dot this dial drew for a faceless value (sensor mode, lift-off, the two timeouts)
+	     is dropped rather than repositioned: the active segment's own accent arc already marks
+	     the position, so a second dot was a third indicator of the same value and, at a label
+	     positioned just outside the ring, regularly landed on top of that label's text (operator
+	     feedback, 2026-09-16). -->
+	{#if !unknown && faceInfo}
+		<image
+			class="pointer-sprite"
+			href={faceInfo.pointerSrc}
+			x={CX - pointerWidth / 2}
+			y={CY - pointerHeight}
+			width={pointerWidth}
+			height={pointerHeight}
+			transform="rotate({pointerBearing} {CX} {CY})"
+			filter="url(#{uid}-ink)"
+			aria-hidden="true"
+		/>
 	{/if}
 
 	{#each values as option, i (String(option.value))}
 		{@const p = pointOnCircle(CX, CY, LABEL_RADIUS, i * segmentAngle)}
 		<text
 			class="segment-label"
-			class:active={!unknown && i === displayIndex}
+			class:active={!unknown && !hasCenterText && i === displayIndex}
 			x={p.x}
 			y={p.y}
+			text-anchor={labelAnchor(i * segmentAngle)}
+			dominant-baseline={labelBaseline(i * segmentAngle)}
 			style="font-size: {fixedFontSize(14)}px"
 		>{option.label}</text>
 	{/each}
 
 	{#if centerAction}
-		<foreignObject x={CX - 30} y={CY - 42} width="60" height="60">
+		<!-- foreignObject's own x/y/width/height are not scaled by this <svg>'s viewBox transform
+		     under WebKitGTK the way every other element here is (a WebKit foreignObject bug, not a
+		     spec behaviour): left as plain 240-space units, the button rendered at native size and
+		     position, landing oversized and offset toward the bottom-right of the dial (operator
+		     feedback, 2026-09-16, with a screenshot). Pre-multiplying by the same `renderScale`
+		     already used to keep this dial's text a fixed real size corrects for it. -->
+		{@const actionSize = 60 * renderScale}
+		{@const actionX = (CX - 30) * renderScale}
+		{@const actionY = (CY - 42) * renderScale}
+		<foreignObject x={actionX} y={actionY} width={actionSize} height={actionSize}>
 			<div class="center-action">
 				{@render centerAction()}
 			</div>
@@ -295,6 +329,19 @@
 		cursor: not-allowed;
 	}
 
+	/* A dial that is known but currently inactive (highest performance's own timeout while
+	   highest performance is off) reads as inactive at a glance, the same 0.45 dimming Toggle's
+	   own disabled state uses; `unknown` gets the same treatment for free, since it sets the same
+	   class. The centre action (highest performance's on/off button) is excluded: it must stay
+	   fully legible and obviously clickable even while the ring around it reads as inactive, since
+	   it is the one control that turns the ring back on. */
+	.segment-dial.disabled .segment,
+	.segment-dial.disabled .segment-label,
+	.segment-dial.disabled .pointer-sprite,
+	.segment-dial.disabled .center-label {
+		opacity: 0.45;
+	}
+
 	/* Focus ring: the global [tabindex]:focus-visible rule in app.css already gives every
 	   focusable control the square --color-focus outline design.md specifies; no local override. */
 
@@ -313,23 +360,22 @@
 		stroke: var(--color-accent);
 	}
 
-	.pointer {
-		fill: var(--color-ink);
-	}
-
 	/* font-size on .segment-label, .center-label and .center-label.sub is set inline per element
 	   (fixedFontSize above), not here: it must stay a fixed real pixel size regardless of which
 	   --dial-size tier is actually rendered, so it is computed as the inverse of the dial's own
 	   measured scale rather than a static value that would shrink with it. */
+	/* Alignment is set per label as an attribute, not here: each label is anchored away from the
+	   dial's centre so it cannot reach back over the ring, and a rule here would override that
+	   (CSS beats a presentation attribute). */
 	.segment-label {
 		fill: var(--color-ink-2);
 		font-weight: 500;
-		text-anchor: middle;
-		dominant-baseline: middle;
 	}
 
+	/* The active label is the brightest text, not the accent: the accent already belongs to the arc
+	   right beside it, and two accent shapes touching read as one. */
 	.segment-label.active {
-		fill: var(--color-accent);
+		fill: var(--color-ink);
 		font-weight: 700;
 	}
 
@@ -356,7 +402,6 @@
 
 	@media (prefers-reduced-motion: no-preference) {
 		.segment,
-		.pointer,
 		.segment-label {
 			transition:
 				stroke var(--dur-settle) var(--ease-out),

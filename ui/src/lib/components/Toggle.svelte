@@ -1,13 +1,19 @@
 <script lang="ts">
+	import HelpTip from './HelpTip.svelte';
+	import type { HelpKey } from '../help';
+
 	interface Props {
 		checked: boolean;
 		label: string;
 		hint?: string;
+		/** Shows a "?" beside the label explaining what this toggle does (see help.ts). Omitted
+		 * controls show no tip, so a screen that has not been given help copy is unaffected. */
+		helpTopic?: HelpKey;
 		disabled?: boolean;
 		onchange?: (value: boolean) => void;
 	}
 
-	let { checked = $bindable(false), label, hint, disabled = false, onchange }: Props = $props();
+	let { checked = $bindable(false), label, hint, helpTopic, disabled = false, onchange }: Props = $props();
 
 	function toggle() {
 		if (disabled) return;
@@ -18,7 +24,7 @@
 
 <div class="field-row">
 	<div>
-		<div class="field-label">{label}</div>
+		<div class="field-label">{label}{#if helpTopic}<HelpTip topic={helpTopic} />{/if}</div>
 		{#if hint}<div class="field-hint">{hint}</div>{/if}
 	</div>
 	<button

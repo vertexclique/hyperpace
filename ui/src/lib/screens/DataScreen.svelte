@@ -5,6 +5,7 @@
 	import { EVENT_LOG_PAGE_SIZE } from '../data-types';
 	import type { EventLogEntry, ProfileSnapshotRecord } from '../data-types';
 	import EmptyState from '../components/EmptyState.svelte';
+	import HelpTip from '../components/HelpTip.svelte';
 
 	type TabId = 'history' | 'profiles' | 'macros' | 'firmware' | 'settings' | 'backup';
 
@@ -160,6 +161,7 @@
 			<div class="plate-title-group">
 				<span class="plate-stub"></span>
 				<span class="plate-title">Local store</span>
+				<HelpTip topic="dataOverview" />
 			</div>
 		</div>
 		{#if data.overviewLoading && !data.overview}
@@ -212,7 +214,7 @@
 		{#if activeTab === 'history'}
 			<div class="tab-head-row">
 				<div>
-					<h2 class="tab-heading">Device and app history</h2>
+					<h2 class="tab-heading">Device and app history<HelpTip topic="dataHistory" /></h2>
 					<p class="field-hint">Connects, disconnects, battery warnings and settings writes.</p>
 				</div>
 				{#if confirmingClearHistory}
@@ -269,7 +271,7 @@
 		{:else if activeTab === 'profiles'}
 			<div class="tab-head-row">
 				<div>
-					<h2 class="tab-heading">Profile snapshots</h2>
+					<h2 class="tab-heading">Profile snapshots<HelpTip topic="dataProfiles" /></h2>
 					<p class="field-hint">Capture the mouse's full settings, and restore or delete a saved copy.</p>
 				</div>
 			</div>
@@ -351,7 +353,7 @@
 		{:else if activeTab === 'macros'}
 			<div class="tab-head-row">
 				<div>
-					<h2 class="tab-heading">Saved macros</h2>
+					<h2 class="tab-heading">Saved macros<HelpTip topic="dataMacros" /></h2>
 					<p class="field-hint">The macro library, edited from the Macros screen.</p>
 				</div>
 			</div>
@@ -382,7 +384,7 @@
 		{:else if activeTab === 'firmware'}
 			<div class="tab-head-row">
 				<div>
-					<h2 class="tab-heading">Firmware archive</h2>
+					<h2 class="tab-heading">Firmware archive<HelpTip topic="firmwareArchive" /></h2>
 					<p class="field-hint">Packages imported into the local archive.</p>
 				</div>
 			</div>
@@ -414,7 +416,7 @@
 		{:else if activeTab === 'settings'}
 			<div class="tab-head-row">
 				<div>
-					<h2 class="tab-heading">App settings</h2>
+					<h2 class="tab-heading">App settings<HelpTip topic="dataAppSettings" /></h2>
 					<p class="field-hint">Every stored preference. Reset returns a key to its own default.</p>
 				</div>
 			</div>
@@ -440,7 +442,7 @@
 		{:else if activeTab === 'backup'}
 			<div class="tab-head-row">
 				<div>
-					<h2 class="tab-heading">Backup</h2>
+					<h2 class="tab-heading">Backup<HelpTip topic="dataBackup" /></h2>
 					<p class="field-hint">
 						Export every collection as one file, or import a backup: matching records already present
 						are skipped, nothing is overwritten. Firmware entries carry their index metadata only,

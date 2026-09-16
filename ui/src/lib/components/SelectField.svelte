@@ -1,4 +1,7 @@
 <script lang="ts" generics="T extends string | number">
+	import HelpTip from './HelpTip.svelte';
+	import type { HelpKey } from '../help';
+
 	interface Option {
 		value: T;
 		label: string;
@@ -16,6 +19,9 @@
 		unknown?: boolean;
 		/** Keep the label for screen readers, but don't render it visibly (e.g. inside a table with column headers). */
 		hideLabel?: boolean;
+		/** Shows a "?" beside the label explaining what this field does (see help.ts). Omitted
+		 * fields show no tip. */
+		helpTopic?: HelpKey;
 		onchange?: (value: T) => void;
 	}
 
@@ -27,6 +33,7 @@
 		disabled = false,
 		unknown = false,
 		hideLabel = false,
+		helpTopic,
 		onchange
 	}: Props = $props();
 
@@ -45,7 +52,7 @@
 </script>
 
 <div class="field">
-	<label class="field-label" class:sr-only={hideLabel} for={uid}>{label}</label>
+	<label class="field-label" class:sr-only={hideLabel} for={uid}>{label}{#if helpTopic}<HelpTip topic={helpTopic} />{/if}</label>
 	{#if hint}<div class="field-hint">{hint}</div>{/if}
 	<!-- appearance: none (app.css) strips the native dropdown arrow, so without one drawn here a
 	     select reads as a plain text box, not a control with more choices behind it. A plain

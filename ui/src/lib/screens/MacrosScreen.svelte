@@ -5,6 +5,7 @@
 	import { MACRO_EVENT_KINDS, MACRO_EVENT_MAX_COUNT, MACRO_NAME_MAX_BYTES } from '../types';
 	import EmptyState from '../components/EmptyState.svelte';
 	import SelectField from '../components/SelectField.svelte';
+	import HelpTip from '../components/HelpTip.svelte';
 
 	// MacroEventRecord::kind is a free-form string, not a serde-tagged enum (hyperpace-store
 	// never depends on hyperpace-protocol); these are the only names
@@ -87,7 +88,7 @@
 		<div class="plate-head">
 			<div class="plate-title-group">
 				<span class="plate-stub"></span>
-				<span class="plate-title">Macro library</span>
+				<span class="plate-title">Macro library<HelpTip topic="dataMacros" /></span>
 			</div>
 		</div>
 		<p class="field-hint plate-subtitle">Stored locally, bound to buttons from the Buttons screen.</p>
@@ -139,7 +140,7 @@
 						</span>
 					</div>
 					<div class="field">
-						<span class="field-label">Slot</span>
+						<span class="field-label">Slot<HelpTip topic="macroSlot" /></span>
 						<input
 							class="text-input mono slot-input"
 							type="number"
@@ -162,9 +163,9 @@
 						<div class="event-head">
 							<span></span>
 							<span>Press/release</span>
-							<span>Kind</span>
-							<span>Value</span>
-							<span>Delay (ms)</span>
+							<span>Kind<HelpTip topic="macroEventKind" /></span>
+							<span>Value<HelpTip topic="macroEventValue" /></span>
+							<span>Delay (ms)<HelpTip topic="macroDelay" /></span>
 							<span></span>
 						</div>
 						{#each draft.events as ev, i (i)}

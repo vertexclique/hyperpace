@@ -106,6 +106,23 @@ export const HELP = {
 		title: 'Polling rate switch',
 		body: 'Makes the button step through polling rates, so you can change the rate on the fly without opening the app.'
 	},
+	mediaKey: {
+		title: 'Media key',
+		body: 'Sends a consumer-control key, the kind dedicated media keys on a keyboard send: volume, playback, brightness, or a shortcut such as search or calculator, instead of a mouse click or a keyboard shortcut.'
+	},
+	dpiSwitchAction: {
+		title: 'DPI switch',
+		body: 'Changes DPI stage when the button is pressed. Loop steps through every stage in turn; DPI+ and DPI- move up or down by one stage.',
+		note: 'Whether DPI+ and DPI- stop at the first and last stage or wrap around is not confirmed by the vendor.'
+	},
+	scrollDirection: {
+		title: 'Horizontal scroll',
+		body: 'Makes the button act as a horizontal scroll: pressing it scrolls left or right, instead of the usual up and down wheel scroll.'
+	},
+	macroSlot: {
+		title: 'Macro slot',
+		body: 'The on-device macro slot this macro is written to. Saving a macro with a slot number here writes its steps to the mouse; binding a button to a macro action with the same slot number, on the Buttons screen, is what makes pressing that button play it.'
+	},
 
 	// Macros.
 	macroRecord: {
@@ -120,6 +137,15 @@ export const HELP = {
 	macroCycle: {
 		title: 'Repeat',
 		body: 'How the macro repeats: a set number of times, until the button is released, until any button is pressed, or until the same button is pressed again.'
+	},
+	macroEventKind: {
+		title: 'Kind',
+		body: 'What this step sends: a modifier key (Ctrl, Shift, Alt, Win), a regular key, a consumer control such as volume or playback, or a mouse button.'
+	},
+	macroEventValue: {
+		title: 'Value',
+		body: 'The code for this step: a button code for Mouse (1 left, 2 right, 4 middle, 8 backward, 16 forward), or the HID usage id the mouse expects for Key, Modifier and Consumer steps.',
+		note: 'Entered directly, with no lookup here. Key and Consumer codes match the Key list and Media key list on the Buttons screen; Modifier codes are a bitmask, 1 for left Ctrl and doubling for each next modifier.'
 	},
 
 	// Lighting: DPI indicator and receiver.
@@ -163,6 +189,11 @@ export const HELP = {
 	},
 
 	// Settings.
+	deviceConnection: {
+		title: 'Device connection',
+		body: 'Connects to a Hyperpace mouse over its 2.4 GHz receiver or a cable, or to the built-in simulator when no real mouse is attached. Rescan looks again for available connections, and Disconnect drops the current one.',
+		note: 'Access from here is always read-only: settings can be read and shown, but not written back to the device.'
+	},
 	profile: {
 		title: 'On-board profile',
 		body: 'The mouse stores separate sets of settings in slots. Switching slots changes every setting at once, and the choice is kept on the mouse, so it works on any computer.'
@@ -195,12 +226,20 @@ export const HELP = {
 		body: 'Firmware packages kept on this computer for the mouse and the receiver, so you can install a newer version or return to an older one.',
 		note: 'Installing firmware rewrites the device itself. Keep the mouse charged and connected until it finishes.'
 	},
+	firmwareCheckUpdates: {
+		title: 'Check for updates',
+		body: 'Compares the packages already in the archive above against what the connected device reports, and says whether a newer one for it is already on hand. It never reaches out to the vendor itself; that is what watching for publication does.'
+	},
 	firmwareImport: {
 		title: 'Import a package',
 		body: 'Adds a firmware package file to the archive. Only packages that match this mouse or receiver are accepted.'
 	},
 
 	// Data management.
+	dataOverview: {
+		title: 'Local store',
+		body: 'Everything Hyperpace has saved on this computer, independent of any mouse: history entries, profile snapshots, macros, app settings and the firmware archive index. The tiles above count each collection; store size and location are shown below them.'
+	},
 	dataHistory: {
 		title: 'History',
 		body: 'A log of what happened to the mouse: connections, disconnections, sleep, settings changes it reported, and low battery. The newest 2000 entries are kept.'
@@ -208,6 +247,14 @@ export const HELP = {
 	dataProfiles: {
 		title: 'Saved profiles',
 		body: 'Snapshots of every mouse setting, stored on this computer. Restoring one writes all of its settings back to the mouse.'
+	},
+	dataMacros: {
+		title: 'Saved macros',
+		body: 'The macro library stored on this computer: every macro you have recorded, whether or not it is bound to a button right now. Recorded and edited from the Macros screen; deleting one here removes it from the library entirely.'
+	},
+	dataAppSettings: {
+		title: 'App settings',
+		body: 'Every preference Hyperpace has stored for itself on this computer, as raw key and value pairs: the battery warning threshold, launch at login, firmware watching and the rest. Reset returns one key to its own default.'
 	},
 	dataBackup: {
 		title: 'Backup',

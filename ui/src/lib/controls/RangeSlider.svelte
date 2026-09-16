@@ -8,6 +8,9 @@
 	// Two value modes: continuous (`min`/`max`/`step`, evenly spaced: DPI per stage, debounce, the
 	// raw receiver timeout) or discrete `stops` (unevenly spaced named values laid out in equal
 	// slots: polling rate's 125/250/.../8000 Hz).
+	import HelpTip from '../components/HelpTip.svelte';
+	import type { HelpKey } from '../help';
+
 	interface Stop {
 		value: number;
 		label: string;
@@ -17,6 +20,9 @@
 		value: number;
 		label: string;
 		hint?: string;
+		/** Shows a "?" beside the label explaining what this control does (see help.ts). Omitted
+		 * controls show no tip. */
+		helpTopic?: HelpKey;
 		min?: number;
 		max?: number;
 		step?: number;
@@ -26,6 +32,11 @@
 		stops?: Stop[];
 		/** Values (continuous mode only) that get a labelled tick mark. Defaults to `[min, max]`. */
 		ticks?: number[];
+		/** Continuous mode only: `'log'` spaces the track logarithmically instead of linearly, so a
+		 * range whose real values cluster near one end (DPI: most stages sit in the low thousands
+		 * of a 50-40000 scale) still spreads them usefully across the track. Committed and typed
+		 * values are unaffected: `step` still snaps them the same way either scale. */
+		scale?: 'linear' | 'log';
 		unit?: string;
 		format?: (value: number) => string;
 		disabled?: boolean;
@@ -43,11 +54,13 @@
 		value = $bindable(0),
 		label,
 		hint,
+		helpTopic,
 		min = 0,
 		max = 100,
 		step = 1,
 		stops,
 		ticks,
+		scale = 'linear',
 		unit = '',
 		format,
 		disabled = false,
@@ -91,6 +104,11 @@
 	let tickValues = $derived(
 		sortedStops ? sortedStops.map((s) => s.value) : (ticks ?? [effectiveMin, effectiveMax])
 	);
+	// Log10 of the floor/ceiling, used to map a value to/from track position on a log scale.
+	// `effectiveMin` is never <= 0 for any current caller (DPI's real floor is 50); a scale that
+	// ever needed to reach 0 would need its own zero-symlog handling, not attempted here.
+	let logMin = $derived(scale === 'log' ? Math.log10(Math.max(effectiveMin, 1e-9)) : 0);
+	let logMax = $derived(scale === 'log' ? Math.log10(Math.max(effectiveMax, 1e-9)) : 0);
 
 	function nearestStopIndex(v: number): number {
 		if (!sortedStops) return -1;
@@ -121,6 +139,10 @@
 		if (sortedStops) {
 			return sortedStops.length > 1 ? nearestStopIndex(v) / (sortedStops.length - 1) : 0;
 		}
+		if (scale === 'log') {
+			const lv = Math.log10(Math.max(v, effectiveMin, 1e-9));
+			return logMax > logMin ? (lv - logMin) / (logMax - logMin) : 0;
+		}
 		return effectiveMax > effectiveMin ? (v - effectiveMin) / (effectiveMax - effectiveMin) : 0;
 	}
 
@@ -128,6 +150,9 @@
 		if (sortedStops) {
 			const index = Math.round(fraction * (sortedStops.length - 1));
 			return sortedStops[Math.min(sortedStops.length - 1, Math.max(0, index))].value;
+		}
+		if (scale === 'log') {
+			return normalizeValue(10 ** (logMin + fraction * (logMax - logMin)));
 		}
 		return normalizeValue(effectiveMin + fraction * (effectiveMax - effectiveMin));
 	}
@@ -173,11 +198,25 @@
 		const slot = widest + TICK_GAP_PX;
 		const maxCount = Math.max(2, Math.min(tickValues.length, Math.floor(wrapWidth / slot)));
 		if (maxCount >= tickValues.length) return tickValues;
-		const indices = new Set<number>();
-		for (let i = 0; i < maxCount; i++) {
-			indices.add(Math.round((i * (tickValues.length - 1)) / (maxCount - 1)));
+		if (sortedStops) {
+			// Discrete named stops: pick maxCount of the real stops nearest an even spread of
+			// indices, since an interpolated in-between value would not be a value this control
+			// can actually land on.
+			const indices = new Set<number>();
+			for (let i = 0; i < maxCount; i++) {
+				indices.add(Math.round((i * (tickValues.length - 1)) / (maxCount - 1)));
+			}
+			return [...indices].sort((a, b) => a - b).map((i) => tickValues[i]);
 		}
-		return [...indices].sort((a, b) => a - b).map((i) => tickValues[i]);
+		// Continuous range: generate maxCount ticks evenly spaced along the control's own scale
+		// (respecting `scale`) and snapped to `step`, so the ticks that fit are always evenly
+		// spaced on the track, never a lopsided subset of the full candidate list (operator
+		// feedback, 2026-09-16: debounce's ticks thinned to "0 ms, 15 ms, 25 ms", a 15/10 ms gap).
+		const generated = new Set<number>();
+		for (let i = 0; i < maxCount; i++) {
+			generated.add(valueFromFraction(i / (maxCount - 1)));
+		}
+		return [...generated].sort((a, b) => a - b);
 	});
 
 	let committedFraction = $derived(fractionOf(clampedValue));
@@ -278,7 +317,7 @@
 </script>
 
 <div class="field">
-	<label class="field-label" for={uid}>{label}</label>
+	<label class="field-label" for={uid}>{label}{#if helpTopic}<HelpTip topic={helpTopic} />{/if}</label>
 	{#if hint}<div class="field-hint">{hint}</div>{/if}
 
 	<div class="range-slider-wrap" bind:clientWidth={wrapWidth}>

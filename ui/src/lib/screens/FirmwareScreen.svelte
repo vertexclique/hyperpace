@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { device } from '../device.svelte';
 	import EmptyState from '../components/EmptyState.svelte';
+	import HelpTip from '../components/HelpTip.svelte';
 
 	let checking = $state(false);
 	// Distinct from `checking`: whether a check has ever completed, so a screen freshly opened
@@ -86,7 +87,7 @@
 	<div class="grid firmware-grid">
 		<section class="plate">
 			<div class="plate-head">
-				<h2 class="plate-title">Firmware archive</h2>
+				<h2 class="plate-title">Firmware archive<HelpTip topic="firmwareArchive" /></h2>
 				<span class="chip chip-warning">Unverified on hardware</span>
 			</div>
 			<p class="plate-subtitle">
@@ -178,7 +179,7 @@
 
 			<div class="field-row">
 				<div>
-					<div class="field-label">Check for updates</div>
+					<div class="field-label">Check for updates<HelpTip topic="firmwareCheckUpdates" /></div>
 					<div class="field-hint">
 						Compares the local archive above against what the connected device reports, for an
 						already-imported package newer than the installed version.
@@ -217,7 +218,7 @@
 			<div class="acquire-block">
 				<div class="field-row">
 					<div>
-						<div class="field-label">Watch for publication</div>
+						<div class="field-label">Watch for publication<HelpTip topic="firmwareWatch" /></div>
 						<div class="field-hint">
 							Checks the vendor's own configuration files and firmware directory paths for a
 							change, and reports what it finds. Never downloads or installs anything on its own;
@@ -269,7 +270,7 @@
 			<div class="acquire-block">
 				<div class="field-row">
 					<div>
-						<div class="field-label">Import a package</div>
+						<div class="field-label">Import a package<HelpTip topic="firmwareImport" /></div>
 						<div class="field-hint">
 							Accepts only a package whose identity markers match this hardware.
 						</div>

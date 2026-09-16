@@ -382,6 +382,30 @@ class DeviceStore {
 		}
 	}
 
+	/**
+	 * The instant-apply write path: writes one setting, or a small group of settings that only
+	 * make sense written together (growing the DPI stage count and filling the new stage's value
+	 * in the same call), and reconciles from a fresh read, all through `writeSettings` above so
+	 * there is exactly one place that turns a request into a device write (see the "one function"
+	 * rule). A screen calls this the moment an operator commits a value, the same way the vendor's
+	 * own configurator does, instead of collecting edits behind an "Apply" button.
+	 *
+	 * Unlike `writeSettings`, a failure is returned as a message rather than thrown: the caller
+	 * already shows its control at the new value optimistically, so on failure it puts that one
+	 * control back to `device.settings`'s last known value (unchanged here, since the write never
+	 * landed) and shows this message beside just that control, never a screen-wide banner
+	 * (design.md "Microinteractions stance"). A success returns null and changes nothing else,
+	 * since a landed write is silent.
+	 */
+	async commitSetting(request: WriteSettingRequest | WriteSettingRequest[]): Promise<string | null> {
+		try {
+			await this.writeSettings(Array.isArray(request) ? request : [request]);
+			return null;
+		} catch (err) {
+			return err instanceof Error ? err.message : String(err);
+		}
+	}
+
 	async setButton(index: number, action: ButtonAction, keystroke?: Keystroke) {
 		try {
 			const request: SetButtonRequest = keystroke ? { index, action, keystroke } : { index, action };
