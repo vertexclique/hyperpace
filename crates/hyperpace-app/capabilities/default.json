@@ -21,6 +21,8 @@
     "allow-receiver-light",
     "allow-read-receiver-light",
     "allow-export-config",
+    "allow-export-config-file",
+    "allow-import-config-file",
     "allow-import-config",
     "allow-firmware-list",
     "allow-firmware-import",

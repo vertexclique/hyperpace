@@ -25,6 +25,8 @@ export const COMMAND_NAMES = [
 	'receiver_light',
 	'read_receiver_light',
 	'export_config',
+	'export_config_file',
+	'import_config_file',
 	'import_config',
 	'firmware_list',
 	'firmware_import',

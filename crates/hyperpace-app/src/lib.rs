@@ -123,6 +123,7 @@ pub fn run() -> Result<(), AppError> {
     };
     let app = builder
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -145,6 +146,8 @@ pub fn run() -> Result<(), AppError> {
             commands::device::receiver_light,
             commands::device::read_receiver_light,
             commands::device::export_config,
+            commands::device::export_config_file,
+            commands::device::import_config_file,
             commands::device::import_config,
             commands::firmware::firmware_list,
             commands::firmware::firmware_import,

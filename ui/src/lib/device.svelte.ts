@@ -473,6 +473,32 @@ class DeviceStore {
 		}
 	}
 
+	/**
+	 * Save every setting on the mouse to a file the operator picks, returning the path written, or
+	 * null when they cancelled. The app writes the file itself; this window cannot.
+	 */
+	async exportConfigToFile(): Promise<string | null> {
+		try {
+			const path = await invoke<string | null>('export_config_file');
+			this.recovered('Could not save the settings file');
+			return path;
+		} catch (err) {
+			this.fail('Could not save the settings file', err);
+		}
+	}
+
+	/** Load settings from a file the operator picks and write them to the mouse. */
+	async importConfigFromFile(): Promise<string | null> {
+		try {
+			const path = await invoke<string | null>('import_config_file');
+			if (path) await this.refreshSettings();
+			this.recovered('Could not load the settings file');
+			return path;
+		} catch (err) {
+			this.fail('Could not load the settings file', err);
+		}
+	}
+
 	async exportConfig(): Promise<Uint8Array> {
 		try {
 			const bytes = await invoke<number[]>('export_config');

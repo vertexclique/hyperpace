@@ -59,7 +59,8 @@
 	let profileSaving = $state(false);
 	let exporting = $state(false);
 	let importing = $state(false);
-	let configFileInput = $state<HTMLInputElement | null>(null);
+	/** What the last save or load did, shown under the two buttons. */
+	let backupNote = $state<string | null>(null);
 	let hasData = $derived(device.settings !== null);
 	let otherDevices = $derived(device.devices.filter((d) => d.backend !== device.backend));
 	let profileUnknown = $derived(!hasData || device.settings?.profile.state === 'unsupported');
@@ -140,33 +141,28 @@
 		}
 	}
 
+	// Saving and loading happen in the app itself, through the system's own file dialogs: a window
+	// like this one cannot put a file on disk (the download link this used to build did nothing at
+	// all), and a file chooser inside the page cannot give the app a path it may read.
 	async function exportConfig() {
 		exporting = true;
+		backupNote = null;
 		try {
-			const bytes = await device.exportConfig();
-			const blob = new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' });
-			const url = URL.createObjectURL(blob);
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = 'hyperpace-config.bin';
-			a.click();
-			URL.revokeObjectURL(url);
+			const path = await device.exportConfigToFile();
+			if (path) backupNote = `Saved to ${path}`;
 		} finally {
 			exporting = false;
 		}
 	}
 
-	async function onImportChosen(e: Event) {
-		const input = e.target as HTMLInputElement;
-		const file = input.files?.[0];
-		if (!file) return;
+	async function importConfig() {
 		importing = true;
+		backupNote = null;
 		try {
-			const bytes = new Uint8Array(await file.arrayBuffer());
-			await device.importConfig(bytes);
+			const path = await device.importConfigFromFile();
+			if (path) backupNote = `Loaded from ${path}`;
 		} finally {
 			importing = false;
-			input.value = '';
 		}
 	}
 
@@ -333,30 +329,20 @@
 		<div class="plate-head">
 			<h2 class="plate-title">Configuration backup<HelpTip topic="configExport" /></h2>
 		</div>
-		<p class="plate-subtitle">Export or import the full settings shadow as a .bin file.</p>
+		<p class="plate-subtitle">Save every setting on the mouse to a file, or load one back onto it.</p>
 		<div class="field-row">
-			<span class="field-label">Export current configuration</span>
+			<span class="field-label">Save settings to a file</span>
 			<button class="btn" disabled={!device.connected || exporting} onclick={exportConfig}>
-				{exporting ? 'Exporting...' : 'Export'}
+				{exporting ? 'Saving...' : 'Save'}
 			</button>
 		</div>
 		<div class="field-row backup-row">
-			<span class="field-label">Import a configuration file</span>
-			<button
-				class="btn"
-				disabled={!device.connected || importing}
-				onclick={() => configFileInput?.click()}
-			>
-				{importing ? 'Importing...' : 'Choose file'}
+			<span class="field-label">Load settings from a file</span>
+			<button class="btn" disabled={!device.connected || importing} onclick={importConfig}>
+				{importing ? 'Loading...' : 'Load'}
 			</button>
-			<input
-				bind:this={configFileInput}
-				type="file"
-				accept=".bin"
-				class="hidden-input"
-				onchange={onImportChosen}
-			/>
 		</div>
+		{#if backupNote}<p class="field-hint mono backup-note">{backupNote}</p>{/if}
 	</section>
 
 	<section class="plate">
@@ -487,6 +473,12 @@
 </div>
 
 <style>
+	/* Where the last save or load went, so the operator knows a file was actually written. */
+	.backup-note {
+		margin-top: var(--space-2xs);
+		overflow-wrap: anywhere;
+	}
+
 	/* Shown when the mouse is plugged in by cable but the operating system refuses this app access
 	   to it: the one connection problem an operator can fix themselves, so it names the fix. */
 	.cable-warning {
@@ -664,9 +656,6 @@
 		gap: var(--space-sm);
 	}
 
-	.hidden-input {
-		display: none;
-	}
 
 	.error-text {
 		color: var(--color-danger);

@@ -18,6 +18,7 @@ use hyperpace_protocol::{
 };
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State, Window};
+use tauri_plugin_dialog::DialogExt;
 
 use crate::blocking::blocking;
 use crate::dto::{
@@ -70,6 +71,9 @@ pub(crate) fn import_config_bytes(state: &AppState, bytes: &[u8]) -> Result<(), 
 /// poll").
 const PAIR_POLL_INTERVAL: Duration = Duration::from_secs(1);
 /// Polls [`pair_receiver`] allows before giving up and reporting failure itself, matching the
+/// The name a saved settings file is offered under.
+const DEFAULT_CONFIG_FILE_NAME: &str = "mouse-settings.bin";
+
 /// vendor driver's own cap (section 10.1: "20 ticks force Fail").
 const MAX_PAIR_POLLS: u32 = 20;
 
@@ -475,6 +479,75 @@ fn query_receiver_light(handle: &DeviceHandle) -> Result<ReceiverLightStateDto, 
 fn apply_receiver_light(handle: &DeviceHandle, light: ReceiverLight) -> Result<(), AppError> {
     let reply = handle.request(request::receiver_light(&light), REQUEST_TIMEOUT)?;
     require_supported(&reply)
+}
+
+/// Save the connected device's settings to a file the operator chooses.
+///
+/// The file is written here rather than handed to the interface: a web view has no way to put a
+/// file on disk (a download link does nothing inside the desktop window, which is how this silently
+/// did nothing before), and the operator needs a real save dialog with a real path.
+///
+/// Returns the path written, or `None` when the operator cancelled the dialog.
+///
+/// # Errors
+///
+/// Returns an error message when no device is connected, its model is unrecognized, the device did
+/// not answer the read in time, or the file could not be written.
+#[tauri::command]
+pub async fn export_config_file(app: AppHandle) -> Result<Option<String>, String> {
+    to_command_result(
+        blocking(move || {
+            let bytes = export_config_bytes(&app.state::<AppState>())?;
+            let Some(path) = app
+                .dialog()
+                .file()
+                .set_title("Save mouse settings")
+                .set_file_name(DEFAULT_CONFIG_FILE_NAME)
+                .add_filter("Mouse settings", &["bin"])
+                .blocking_save_file()
+            else {
+                return Ok(None);
+            };
+            let path = path
+                .into_path()
+                .map_err(|error| AppError::InvalidData(error.to_string()))?;
+            std::fs::write(&path, bytes).map_err(AppError::from)?;
+            Ok(Some(path.display().to_string()))
+        })
+        .await,
+    )
+}
+
+/// Load settings from a file the operator chooses and write them to the connected device.
+///
+/// Returns the path read, or `None` when the operator cancelled the dialog.
+///
+/// # Errors
+///
+/// Returns an error message when no device is connected, the file could not be read, it is not a
+/// settings file for this model, or the device did not accept the write.
+#[tauri::command]
+pub async fn import_config_file(app: AppHandle) -> Result<Option<String>, String> {
+    to_command_result(
+        blocking(move || {
+            let Some(path) = app
+                .dialog()
+                .file()
+                .set_title("Load mouse settings")
+                .add_filter("Mouse settings", &["bin"])
+                .blocking_pick_file()
+            else {
+                return Ok(None);
+            };
+            let path = path
+                .into_path()
+                .map_err(|error| AppError::InvalidData(error.to_string()))?;
+            let bytes = std::fs::read(&path).map_err(AppError::from)?;
+            import_config_bytes(&app.state::<AppState>(), &bytes)?;
+            Ok(Some(path.display().to_string()))
+        })
+        .await,
+    )
 }
 
 /// Export the connected device's full settings shadow as a `.bin` config file.

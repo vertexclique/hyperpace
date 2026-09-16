@@ -53,6 +53,7 @@ sha2 = "0.10"
 # dependency-without-review rule (docs/decs/hyperpace_DECS.md).
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider", "blocking"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+tauri-plugin-dialog = "3.0.0-alpha.0"
 
 [dev-dependencies]
 # Same version `hyperpace-store` already pins; used here to open a temporary local store for
