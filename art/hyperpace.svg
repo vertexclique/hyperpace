@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Neon Glow Filter -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    
+    <!-- Background Tech Grid -->
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#1A2B4C" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <!-- Deep Void Background -->
+  <rect width="512" height="512" fill="#050914"/>
+  
+  <!-- Tech Grid Overlay -->
+  <rect width="512" height="512" fill="url(#grid)"/>
+
+  <!-- Chamfered Outer HUD Frame -->
+  <path d="M 64 24 L 448 24 L 488 64 L 488 448 L 448 488 L 64 488 L 24 448 L 24 64 Z" 
+        fill="none" stroke="#00F0FF" stroke-width="4" opacity="0.2"/>
+        
+  <!-- Neon Corner Brackets -->
+  <path d="M 24 120 L 24 64 L 80 24" fill="none" stroke="#00F0FF" stroke-width="8" filter="url(#glow)"/>
+  <path d="M 488 392 L 488 448 L 432 488" fill="none" stroke="#00F0FF" stroke-width="8" filter="url(#glow)"/>
+  
+  <!-- Abstract Angular Mouse Shell -->
+  <polygon points="256,80 350,170 340,390 256,450 172,390 162,170" 
+           fill="#0A1526" stroke="#00F0FF" stroke-width="8" filter="url(#glow)"/>
+  
+  <!-- Aggressive Inner Chassis Cuts -->
+  <polygon points="256,110 310,180 256,220 202,180" fill="none" stroke="#FF003C" stroke-width="6" filter="url(#glow)"/>
+  
+  <!-- Core / Scroll Wheel -->
+  <rect x="246" y="130" width="20" height="60" rx="4" fill="#FF003C" filter="url(#glow)"/>
+  <line x1="256" y1="220" x2="256" y2="410" stroke="#00F0FF" stroke-width="6" stroke-dasharray="12, 12"/>
+  
+  <!-- Data Node Traces -->
+  <path d="M 162 260 L 100 260 L 64 224" fill="none" stroke="#00F0FF" stroke-width="4"/>
+  <circle cx="64" cy="224" r="6" fill="#00F0FF" filter="url(#glow)"/>
+  
+  <path d="M 340 320 L 400 320 L 440 360" fill="none" stroke="#FF003C" stroke-width="4"/>
+  <circle cx="440" cy="360" r="6" fill="#FF003C" filter="url(#glow)"/>
+</svg>

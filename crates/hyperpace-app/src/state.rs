@@ -13,11 +13,11 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use hyperpace_device::{Access, DeviceEvent, DeviceHandle, HidTransport, SimTransport};
 use hyperpace_protocol::{Battery, DeviceIdentity, ModelTable, Transport, table_for};
-use hyperpace_store::Store;
+use hyperpace_store::{EventRecord, Store};
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager};
 
@@ -215,6 +215,65 @@ impl AppState {
         }
     }
 
+    /// Append one line to the device history the store keeps, and that the Data screen reads
+    /// back.
+    ///
+    /// Only state transitions are recorded, never a poll: the battery is read every 5 seconds, and
+    /// a row per poll would bury the events worth keeping under thousands of identical ones and
+    /// grow the store without bound. `message` is shown to a person as written, so it says what
+    /// happened in one plain sentence.
+    ///
+    /// A store failure here is logged and dropped rather than propagated: losing a history line
+    /// must never take down the connection that produced it.
+    pub(crate) fn record_event(&self, kind: &str, message: String) {
+        let at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |since| i64::try_from(since.as_secs()).unwrap_or(0));
+        let record = EventRecord {
+            at,
+            kind: kind.to_owned(),
+            message,
+            detail: None,
+        };
+        if let Err(error) = self.store.events().create(&record) {
+            tracing::warn!(%error, kind, "could not record a device event in the history");
+        }
+    }
+
+    /// Whether a device is connected right now, for the auto-connect watcher deciding whether
+    /// there is anything to do.
+    #[must_use]
+    pub fn is_connected(&self) -> bool {
+        lock(&self.device).is_some()
+    }
+
+    /// Drop the current connection without bumping [`Self::connection_id`], used by the tracker
+    /// thread when its own device reported [`DeviceEvent::Disconnected`]: the connection is over,
+    /// so [`Self::snapshot`] must stop claiming otherwise, but the tracker is still the live one
+    /// for that id and has an event left to announce.
+    pub(crate) fn clear_connection(&self) {
+        *lock(&self.device) = None;
+    }
+
+    /// Fan `payload` out to every subscribed window and refresh the tray from the current
+    /// snapshot.
+    ///
+    /// The tracker thread calls this for every event a connected device produces, and
+    /// [`crate::autoconnect`] calls it for the one transition no connected device can report,
+    /// its own unplug. Both go through here so the windows and the tray can never be told
+    /// different stories.
+    pub(crate) fn announce(&self, payload: DeviceEventPayload) {
+        for (label, channel) in self.subscribed_channels() {
+            if channel.send(payload).is_err() {
+                // The window behind this channel is gone (destroyed to the tray, or closing);
+                // drop it so a future subscribe for the same label replaces it cleanly instead
+                // of piling up dead entries.
+                self.unsubscribe(&label);
+            }
+        }
+        tray::on_state_changed(&self.app, self.snapshot());
+    }
+
     /// Register `channel` to receive every device event from now on for `window_label`,
     /// replacing any channel already registered for that window (a window recreated after being
     /// destroyed re-subscribes under the same label).
@@ -338,6 +397,42 @@ fn open_connection(backend: DeviceBackendDto, access: Access) -> Result<DeviceHa
     Ok(hyperpace_device::spawn(transport, access)?)
 }
 
+/// The history line one device event deserves, or `None` for an event that is a poll rather than a
+/// transition.
+///
+/// [`DeviceEvent::Battery`] is deliberately absent: it arrives every 5 seconds and says nothing
+/// new. Crossing the low-battery threshold is recorded by the caller instead, because that is a
+/// transition.
+fn history_line(event: DeviceEvent) -> Option<(&'static str, String)> {
+    match event {
+        DeviceEvent::Connected(identity) => Some((
+            "connected",
+            format!(
+                "Connected over {} at up to {} Hz.",
+                if matches!(
+                    identity.link,
+                    hyperpace_protocol::LinkType::Wired1k | hyperpace_protocol::LinkType::Wired8k
+                ) {
+                    "a wired link"
+                } else {
+                    "2.4 GHz"
+                },
+                identity.link.max_polling_hz()
+            ),
+        )),
+        DeviceEvent::Disconnected => Some(("disconnected", "The mouse disconnected.".to_owned())),
+        DeviceEvent::Offline => Some((
+            "offline",
+            "The mouse stopped answering; it is asleep or out of range.".to_owned(),
+        )),
+        DeviceEvent::Changed(_) => Some((
+            "changed",
+            "The mouse reported that its settings changed.".to_owned(),
+        )),
+        DeviceEvent::Battery(_) => None,
+    }
+}
+
 /// Start the background thread that drains `handle`'s events, updates the tracked state, fans
 /// each event out to every subscribed window, and drives the tray.
 ///
@@ -365,19 +460,22 @@ fn spawn_tracker(app: AppHandle, id: u64, handle: &DeviceHandle) -> Result<(), A
                     active.tracked.apply(event, threshold)
                 };
 
-                let payload = DeviceEventPayload::from(event);
-                for (label, channel) in state.subscribed_channels() {
-                    if channel.send(payload).is_err() {
-                        // The window behind this channel is gone (destroyed to the tray, or
-                        // closing); drop it so a future subscribe for the same label replaces it
-                        // cleanly instead of piling up dead entries.
-                        state.unsubscribe(&label);
-                    }
+                // A device that reported its own disconnection is gone: clear the connection
+                // before announcing, so the snapshot the windows and the tray receive with this
+                // event does not still claim one.
+                if matches!(event, DeviceEvent::Disconnected) {
+                    state.clear_connection();
                 }
-
-                tray::on_state_changed(&app, state.snapshot());
+                if let Some((kind, message)) = history_line(event) {
+                    state.record_event(kind, message);
+                }
+                state.announce(DeviceEventPayload::from(event));
                 match edge {
-                    LowBatteryEdge::Entered(percent) => tray::notify_low_battery(&app, percent),
+                    LowBatteryEdge::Entered(percent) => {
+                        state
+                            .record_event("battery_low", format!("Battery dropped to {percent}%."));
+                        tray::notify_low_battery(&app, percent);
+                    }
                     LowBatteryEdge::None | LowBatteryEdge::Cleared => {}
                 }
             }
@@ -388,8 +486,11 @@ fn spawn_tracker(app: AppHandle, id: u64, handle: &DeviceHandle) -> Result<(), A
 
 #[cfg(test)]
 mod tests {
+    // Tests may assert: the doctrine bans panics on production paths, not in tests.
+    #![allow(clippy::unwrap_used)]
+
     use super::*;
-    use hyperpace_protocol::LinkType;
+    use hyperpace_protocol::{LinkType, StatusChanged};
 
     fn identity() -> DeviceIdentity {
         DeviceIdentity {
@@ -405,6 +506,46 @@ mod tests {
             charging,
             millivolts: 3900,
         }
+    }
+
+    #[test]
+    fn a_battery_poll_never_becomes_a_history_line() {
+        // Every 5 seconds forever; recording it would bury the real events and grow the store
+        // without bound.
+        assert_eq!(history_line(DeviceEvent::Battery(battery(90, false))), None);
+    }
+
+    #[test]
+    fn every_transition_becomes_one_plain_history_line() {
+        for event in [
+            DeviceEvent::Connected(identity()),
+            DeviceEvent::Disconnected,
+            DeviceEvent::Offline,
+            DeviceEvent::Changed(StatusChanged {
+                dpi: true,
+                polling: false,
+                profile: false,
+                dpi_indicator: false,
+                lighting: false,
+                battery: false,
+            }),
+        ] {
+            let line = history_line(event);
+            assert!(line.is_some(), "{event:?} should be recorded");
+            let (kind, message) = line.unwrap();
+            assert!(!kind.is_empty());
+            assert!(
+                message.ends_with('.') && message.chars().next().is_some_and(char::is_uppercase),
+                "a history line is shown to a person as written: {message:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_connect_line_names_the_link_the_device_reported() {
+        let (kind, message) = history_line(DeviceEvent::Connected(identity())).unwrap();
+        assert_eq!(kind, "connected");
+        assert_eq!(message, "Connected over 2.4 GHz at up to 2000 Hz.");
     }
 
     #[test]

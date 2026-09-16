@@ -902,6 +902,24 @@ mod tests {
     }
 
     #[test]
+    fn read_keystroke_reads_a_never_written_slot_as_no_keystroke_bound() {
+        // The observed real-hardware defect: `read_keystroke` reads every button's slot
+        // regardless of that button's current action type (see the doc comment above), so a
+        // button that has never been bound to a keystroke has a slot still holding the device's
+        // erased-flash fill byte, 0xFF, not a slot this app ever wrote. That must read back as
+        // "no keystroke bound", not an error.
+        let handle = connected_handle();
+        handle
+            .write_block(offset::KEYSTROKE + 32, &[0xffu8; 32])
+            .unwrap();
+
+        assert_eq!(
+            read_keystroke(&handle, &CID_62_MID_1, 1).unwrap(),
+            crate::dto::KeystrokeDto::default()
+        );
+    }
+
+    #[test]
     fn read_keystroke_refuses_an_index_past_the_model_button_count() {
         let handle = connected_handle();
         let error = read_keystroke(&handle, &CID_62_MID_1, CID_62_MID_1.buttons).unwrap_err();

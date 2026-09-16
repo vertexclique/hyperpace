@@ -8,7 +8,9 @@
 //! Device access defaults to read-only ([`hyperpace_device::Access::default`]); a caller of the
 //! `connect` command must explicitly ask for write access, and the simulator backend is used
 //! unless it explicitly asks for the real device (`commands::device::connect`,
-//! [`dto::ConnectRequest`]).
+//! [`dto::ConnectRequest`]). Those are the defaults for a bare request; the app itself connects
+//! to the operator's own mouse on startup and on hotplug through [`autoconnect`], which asks for
+//! write access because every control in the interface is a write.
 //!
 //! # Layers
 //!
@@ -16,6 +18,8 @@
 //!   boundary.
 //! - [`dto`]: every request and response shape crossing the IPC boundary.
 //! - [`blocking`]: runs a device or store call off the async executor.
+//! - [`autoconnect`]: connects to the operator's own mouse at startup and follows it across
+//!   unplugs and replugs.
 //! - [`state`]: [`state::AppState`], the current connection, and the background thread that
 //!   tracks its events, fans them out to every subscribed window, and drives the tray.
 //! - [`icon`]: renders the battery percentage into the tray icon's own pixels.
@@ -25,6 +29,7 @@
 //!   the webview exists.
 //! - [`commands`]: every Tauri command in the API contract.
 
+pub mod autoconnect;
 pub mod blocking;
 pub mod commands;
 pub mod dto;
@@ -138,6 +143,7 @@ pub fn run() -> Result<(), AppError> {
             app.manage(AppState::new(store, store_root, handle.clone()));
             tray::build(&handle)?;
             window::show_main_window(&handle)?;
+            autoconnect::spawn(handle.clone());
             commands::firmware_watch::spawn_periodic_check(handle);
             Ok(())
         })

@@ -1,4 +1,9 @@
-//! Renders the battery percentage into the tray icon's own pixels.
+//! Renders the battery percentage into the tray icon's own pixels, inside the Hyperpace mark.
+//!
+//! The mark is the logo's own geometry (`art/hyperpace.svg`): a chamfered frame with a neon corner
+//! bracket at the top left and the bottom right. Those shapes are redrawn here as pixels rather
+//! than rasterized from the SVG, because at 40 pixels the logo's grid, traces and glow render as
+//! mush, and because rasterizing an SVG would mean a renderer dependency for one small square.
 //!
 //! `docs/plans/hyperpace.md`: "the tray icon is redrawn only when the displayed bucket changes,
 //! because on this platform every icon update writes a file and crosses D-Bus." This module is
@@ -23,8 +28,13 @@
 /// square icon; large enough that a three-digit "100" is legible at typical panel sizes.
 pub const ICON_SIZE: u32 = 40;
 
-/// Pixel scale of one font cell (each glyph is drawn [`DIGIT_ROWS`] cells tall).
+/// Pixel scale of one font cell for a one or two digit reading (each glyph is drawn
+/// [`DIGIT_ROWS`] cells tall).
 const GLYPH_SCALE: u32 = 3;
+/// Pixel scale used for a three digit reading, which is only ever "100": at [`GLYPH_SCALE`] three
+/// glyphs run into the chamfered frame's own edge, so the full-charge icon steps down a size
+/// rather than losing its margin.
+const GLYPH_SCALE_NARROW: u32 = 2;
 /// Columns in one glyph cell.
 const DIGIT_COLS: u32 = 3;
 /// Rows in one glyph cell.
@@ -73,46 +83,57 @@ fn backdrop_color(percent: Option<u8>) -> [u8; 3] {
     }
 }
 
-/// Set one pixel, if it lies inside the buffer; silently clipped otherwise so a glyph placed near
-/// an edge can never index out of bounds.
-fn set_pixel(rgba: &mut [u8], width: u32, height: u32, x: i32, y: i32, color: [u8; 4]) {
-    if x < 0 || y < 0 || x as u32 >= width || y as u32 >= height {
-        return;
+/// The square RGBA buffer being drawn into, so no drawing function has to thread the buffer, its
+/// width and its height separately.
+struct Canvas<'a> {
+    rgba: &'a mut [u8],
+    size: u32,
+}
+
+impl Canvas<'_> {
+    /// Set one pixel, if it lies inside the buffer; silently clipped otherwise, so a glyph placed
+    /// near an edge can never index out of bounds.
+    fn set(&mut self, x: i32, y: i32, color: [u8; 4]) {
+        if x < 0 || y < 0 || x as u32 >= self.size || y as u32 >= self.size {
+            return;
+        }
+        let offset = (y as u32 * self.size + x as u32) as usize * 4;
+        self.rgba[offset..offset + 4].copy_from_slice(&color);
     }
-    let offset = (y as u32 * width + x as u32) as usize * 4;
-    rgba[offset..offset + 4].copy_from_slice(&color);
 }
 
 /// Draw one glyph with its top-left cell at (`x0`, `y0`) in cell units, each cell expanded to
 /// [`GLYPH_SCALE`] pixels.
-fn draw_glyph(
-    rgba: &mut [u8],
-    width: u32,
-    height: u32,
-    x0: i32,
-    y0: i32,
-    glyph: GlyphRows,
-    color: [u8; 4],
-) {
+fn draw_glyph(canvas: &mut Canvas, x0: i32, y0: i32, glyph: GlyphRows, color: [u8; 4], scale: u32) {
     for (row, bits) in glyph.iter().enumerate() {
         for col in 0..DIGIT_COLS {
             if bits & (1 << (DIGIT_COLS - 1 - col)) == 0 {
                 continue;
             }
-            let px0 = x0 + (col * GLYPH_SCALE) as i32;
-            let py0 = y0 + (row as u32 * GLYPH_SCALE) as i32;
-            for dy in 0..GLYPH_SCALE {
-                for dx in 0..GLYPH_SCALE {
-                    set_pixel(rgba, width, height, px0 + dx as i32, py0 + dy as i32, color);
+            let px0 = x0 + (col * scale) as i32;
+            let py0 = y0 + (row as u32 * scale) as i32;
+            for dy in 0..scale {
+                for dx in 0..scale {
+                    canvas.set(px0 + dx as i32, py0 + dy as i32, color);
                 }
             }
         }
     }
 }
 
+/// The cell scale a reading of `digits` glyphs is drawn at.
+fn glyph_scale(digits: usize) -> u32 {
+    if digits >= 3 {
+        GLYPH_SCALE_NARROW
+    } else {
+        GLYPH_SCALE
+    }
+}
+
 /// Width, in pixels, that `digits` renders at.
 fn digits_width(digits: usize) -> u32 {
-    let glyph_width = DIGIT_COLS * GLYPH_SCALE;
+    let scale = glyph_scale(digits);
+    let glyph_width = DIGIT_COLS * scale;
     digits as u32 * glyph_width + digits.saturating_sub(1) as u32 * GLYPH_GAP
 }
 
@@ -131,49 +152,87 @@ fn digits_of(percent: u8) -> Vec<usize> {
     digits
 }
 
-/// Fill a rounded-rectangle backdrop covering the whole icon, so the icon reads against both a
-/// light and a dark panel regardless of the desktop theme.
-fn fill_backdrop(rgba: &mut [u8], size: u32, color: [u8; 3]) {
-    let corner = (size / 5).max(1);
+/// The logo's neon cyan, for the corner brackets.
+const BRAND_CYAN: [u8; 4] = [0, 240, 255, 255];
+/// The logo's red, for the charging mark.
+const BRAND_RED: [u8; 4] = [255, 0, 60, 255];
+
+/// How deep each corner is cut, as a fraction of the icon: the logo cuts 40 of its 512 units.
+fn chamfer(size: u32) -> u32 {
+    (size * 40 / 512).max(3)
+}
+
+/// Whether `(x, y)` lies inside the chamfered frame, which is the logo's outer shape: a square
+/// with all four corners cut at 45 degrees.
+fn inside_frame(size: u32, x: u32, y: u32, cut: u32) -> bool {
+    let from_right = size - 1 - x;
+    let from_bottom = size - 1 - y;
+    x + y >= cut
+        && from_right + y >= cut
+        && x + from_bottom >= cut
+        && from_right + from_bottom >= cut
+}
+
+/// Fill the chamfered frame covering the whole icon, so the icon reads against both a light and a
+/// dark panel regardless of the desktop theme. Nothing is drawn outside the frame, so the cut
+/// corners stay transparent and the mark's silhouette is the logo's, not a plain square.
+fn fill_backdrop(canvas: &mut Canvas, color: [u8; 3]) {
+    let size = canvas.size;
+    let cut = chamfer(size);
     for y in 0..size {
         for x in 0..size {
-            // Squared corners are simply skipped, leaving them transparent, which reads as a
-            // rounded rectangle at this icon's own pixel scale without a curve computation.
-            let corner_x = if x < corner {
-                corner - 1 - x
-            } else {
-                x.saturating_sub(size - corner)
-            };
-            let corner_y = if y < corner {
-                corner - 1 - y
-            } else {
-                y.saturating_sub(size - corner)
-            };
-            if corner_x + corner_y > corner {
-                continue;
+            if inside_frame(size, x, y, cut) {
+                canvas.set(x as i32, y as i32, [color[0], color[1], color[2], 255]);
             }
-            set_pixel(
-                rgba,
-                size,
-                size,
-                x as i32,
-                y as i32,
-                [color[0], color[1], color[2], 255],
-            );
         }
     }
 }
 
-/// Draw a small filled triangle (a stand-in lightning mark) in the icon's top-right corner,
-/// indicating the device is charging.
-fn draw_charging_mark(rgba: &mut [u8], size: u32) {
-    let mark = size / 4;
-    let white = [255, 255, 255, 255];
-    for y in 0..mark {
-        for x in 0..(mark - y) {
-            let px = size as i32 - 2 - x as i32;
-            let py = 2 + y as i32;
-            set_pixel(rgba, size, size, px, py, white);
+/// Draw the logo's two neon corner brackets, top left and bottom right, tracing the chamfered
+/// edge. This is what makes the tray icon recognizably this app rather than a generic status pill,
+/// and it is the one place the brand colour appears in the icon: everything else is status.
+fn draw_corner_brackets(canvas: &mut Canvas) {
+    let size = canvas.size;
+    let cut = chamfer(size);
+    let thickness = (size / 20).max(2);
+    let arm = (size / 3).max(cut + thickness);
+
+    for step in 0..arm {
+        for t in 0..thickness {
+            // Top left: down the left edge, then right along the top edge.
+            canvas.set(t as i32, (cut + step) as i32, BRAND_CYAN);
+            canvas.set((cut + step) as i32, t as i32, BRAND_CYAN);
+            // Bottom right: up the right edge, then left along the bottom edge.
+            let far = (size - 1 - t) as i32;
+            canvas.set(far, (size - 1 - cut - step) as i32, BRAND_CYAN);
+            canvas.set((size - 1 - cut - step) as i32, far, BRAND_CYAN);
+        }
+    }
+
+    // The 45 degree run across each cut corner, so the bracket turns the chamfer instead of
+    // stopping short of it.
+    for step in 0..=cut {
+        for t in 0..thickness {
+            let x = (cut - step) as i32;
+            let y = step as i32 + t as i32;
+            canvas.set(x, y, BRAND_CYAN);
+            canvas.set(size as i32 - 1 - x, size as i32 - 1 - y, BRAND_CYAN);
+        }
+    }
+}
+
+/// Draw the logo's red diamond in the icon's top right corner, indicating the device is charging.
+/// The logo puts the same diamond at the head of its shell, so charging reads as part of the mark
+/// rather than a sticker on top of it.
+fn draw_charging_mark(canvas: &mut Canvas) {
+    let size = canvas.size;
+    let radius = (size / 8).max(2) as i32;
+    let cx = size as i32 - radius - 3;
+    let cy = radius + 3;
+    for dy in -radius..=radius {
+        let span = radius - dy.abs();
+        for dx in -span..=span {
+            canvas.set(cx + dx, cy + dy, BRAND_RED);
         }
     }
 }
@@ -188,49 +247,43 @@ fn draw_charging_mark(rgba: &mut [u8], size: u32) {
 pub fn render_battery_icon(percent: Option<u8>, charging: bool) -> TrayIconImage {
     let size = ICON_SIZE;
     let mut rgba = vec![0u8; (size * size * 4) as usize];
-    fill_backdrop(&mut rgba, size, backdrop_color(percent));
+    let mut canvas = Canvas {
+        rgba: &mut rgba,
+        size,
+    };
+    fill_backdrop(&mut canvas, backdrop_color(percent));
+    draw_corner_brackets(&mut canvas);
 
     let glyphs: Vec<usize> = match percent {
         Some(percent) => digits_of(percent.min(100)),
         None => vec![DASH_INDEX],
     };
+    let scale = glyph_scale(glyphs.len());
     let total_width = digits_width(glyphs.len());
     let start_x = (size as i32 - total_width as i32) / 2;
-    let start_y = (size as i32 - (DIGIT_ROWS * GLYPH_SCALE) as i32) / 2;
-    let glyph_advance = (DIGIT_COLS * GLYPH_SCALE + GLYPH_GAP) as i32;
+    let start_y = (size as i32 - (DIGIT_ROWS * scale) as i32) / 2;
+    let glyph_advance = (DIGIT_COLS * scale + GLYPH_GAP) as i32;
 
     for (index, &digit) in glyphs.iter().enumerate() {
         let x = start_x + index as i32 * glyph_advance;
         draw_glyph(
-            &mut rgba,
-            size,
-            size,
+            &mut canvas,
             x,
             start_y,
             DIGIT_FONT[digit],
             [255, 255, 255, 255],
+            scale,
         );
     }
 
     if charging {
-        draw_charging_mark(&mut rgba, size);
+        draw_charging_mark(&mut canvas);
     }
 
     TrayIconImage {
         rgba,
         width: size,
         height: size,
-    }
-}
-
-/// A short, non-branded tooltip line for the tray icon, e.g. `"Hyperpace: 73% (charging)"` or
-/// `"Hyperpace: not connected"`.
-#[must_use]
-pub fn tray_tooltip(percent: Option<u8>, charging: bool) -> String {
-    match percent {
-        Some(percent) if charging => format!("Hyperpace: {percent}% (charging)"),
-        Some(percent) => format!("Hyperpace: {percent}%"),
-        None => "Hyperpace: not connected".to_owned(),
     }
 }
 
@@ -314,12 +367,5 @@ mod tests {
         assert_eq!(digits_of(7), vec![7]);
         assert_eq!(digits_of(42), vec![4, 2]);
         assert_eq!(digits_of(100), vec![1, 0, 0]);
-    }
-
-    #[test]
-    fn tooltip_names_the_state_in_one_plain_sentence() {
-        assert_eq!(tray_tooltip(Some(73), false), "Hyperpace: 73%");
-        assert_eq!(tray_tooltip(Some(73), true), "Hyperpace: 73% (charging)");
-        assert_eq!(tray_tooltip(None, false), "Hyperpace: not connected");
     }
 }
