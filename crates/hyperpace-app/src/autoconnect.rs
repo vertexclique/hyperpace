@@ -16,7 +16,7 @@
 
 use std::thread;
 
-use hyperpace_device::{DeviceError, DeviceEvent, HidTransport, HotplugEvent};
+use hyperpace_device::{CableState, DeviceError, DeviceEvent, HidTransport, HotplugEvent};
 use tauri::{AppHandle, Manager};
 
 use crate::dto::{AccessDto, DeviceBackendDto, DeviceEventPayload};
@@ -89,11 +89,33 @@ fn cable_now_preferred(app: &AppHandle) -> bool {
     state.real_connection_wired() == Some(false) && HidTransport::wired_attached().unwrap_or(false)
 }
 
+/// Record whether a cable is attached that this app cannot open, so the interface can say so.
+fn check_cable(app: &AppHandle) {
+    let Some(state) = app.try_state::<AppState>() else {
+        return;
+    };
+    match HidTransport::cable_state() {
+        Ok(CableState::PermissionDenied) => {
+            tracing::warn!(
+                "the mouse is plugged in by cable but this app is not allowed to open it; install \
+                 the device access rule that ships with Hyperpace and replug the cable"
+            );
+            state.set_cable_blocked(true);
+        }
+        Ok(_) => state.set_cable_blocked(false),
+        Err(error) => {
+            tracing::debug!(%error, "could not check the cable connection");
+            state.set_cable_blocked(false);
+        }
+    }
+}
+
 /// Connect to the real device, unless something is already connected.
 fn try_connect(app: &AppHandle) {
     let Some(state) = app.try_state::<AppState>() else {
         return; // state not managed yet; the setup hook manages it before spawning this thread
     };
+    check_cable(app);
     if state.is_connected() {
         return;
     }

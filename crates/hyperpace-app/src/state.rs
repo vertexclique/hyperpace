@@ -10,7 +10,7 @@
 //! [`hyperpace_device::DeviceHandle`] and its resolved [`hyperpace_protocol::ModelTable`].
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -131,6 +131,10 @@ pub struct AppState {
     /// it observes this no longer matches the id it was spawned with, so a connection superseded
     /// mid-flight can never clobber the one that replaced it.
     connection_id: AtomicU64,
+    /// Whether a cable is attached that this app is not allowed to open, as last checked by the
+    /// watcher. Plain atomic for the same reason the threshold below is: written rarely by one
+    /// thread, read by every snapshot.
+    cable_blocked: AtomicBool,
     /// Cached [`LOW_BATTERY_THRESHOLD_KEY`] app setting. Plain atomic, not the store: read on
     /// every battery event and written rarely by `app_settings`, never contended enough to need a
     /// lock (concurrency doctrine: process-local, infrequently-written state is plain std).
@@ -155,6 +159,7 @@ impl AppState {
             channels: Mutex::new(HashMap::new()),
             connection_id: AtomicU64::new(0),
             low_battery_threshold: AtomicU8::new(threshold),
+            cable_blocked: AtomicBool::new(false),
         }
     }
 
@@ -209,6 +214,7 @@ impl AppState {
     pub fn snapshot(&self) -> DeviceStateDto {
         match lock(&self.device).as_ref() {
             Some(active) => DeviceStateDto {
+                cable_blocked: self.cable_blocked.load(Ordering::Relaxed),
                 connected: true,
                 backend: Some(active.backend),
                 access: Some(active.access.into()),
@@ -217,6 +223,7 @@ impl AppState {
                 online: active.tracked.online,
             },
             None => DeviceStateDto {
+                cable_blocked: self.cable_blocked.load(Ordering::Relaxed),
                 connected: false,
                 backend: None,
                 access: None,
@@ -253,6 +260,16 @@ impl AppState {
         }
         if let Err(error) = prune_event_log(&self.store, EVENT_LOG_CAP) {
             tracing::warn!(%error, "could not prune the device event log");
+        }
+    }
+
+    /// Record what the cable connection can do, so a mouse that is plugged in but unreachable is
+    /// reported as exactly that instead of as no mouse at all.
+    pub(crate) fn set_cable_blocked(&self, blocked: bool) {
+        let previous = self.cable_blocked.swap(blocked, Ordering::Relaxed);
+        if previous != blocked {
+            tray::on_state_changed(&self.app, self.snapshot());
+            self.announce(DeviceEventPayload::from(DeviceEvent::Offline));
         }
     }
 

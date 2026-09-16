@@ -22,6 +22,18 @@ const USAGE_PAGE: u16 = 0xFF02;
 /// Usage of the vendor configuration collection within that page.
 const USAGE: u16 = 0x0002;
 
+/// What the mouse's cable connection can do right now, from [`HidTransport::cable_state`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CableState {
+    /// No cable connection is attached.
+    NotAttached,
+    /// A cable connection is attached and this app may open it.
+    Usable,
+    /// A cable connection is attached but the operating system refuses this app access to it. On
+    /// Linux that means the device access rule Hyperpace ships has not been installed.
+    PermissionDenied,
+}
+
 /// The vendor configuration collection, opened read-write over hidapi.
 ///
 /// Selects the collection by usage page `USAGE_PAGE` and usage `USAGE` (the only collection
@@ -110,6 +122,42 @@ impl HidTransport {
         Ok(api
             .device_list()
             .any(|info| is_vendor_collection(info) && info.product_id() == PRODUCT_ID_WIRED))
+    }
+
+    /// What the cable connection can do right now.
+    ///
+    /// The cable is the only way to reach a mouse that is charging or set to wired: while it is
+    /// plugged in, the mouse stops answering through the receiver. On Linux its device nodes belong
+    /// to root until the access rule Hyperpace ships is installed, and without it the app can see
+    /// the cable but not open it, which must be reported as exactly that rather than as no mouse.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DeviceError::Io`] when the HID subsystem could not be reached.
+    pub fn cable_state() -> Result<CableState, DeviceError> {
+        let api = HidApi::new().map_err(|error| DeviceError::Io(error.to_string()))?;
+        let Some(candidate) = api
+            .device_list()
+            .find(|info| is_vendor_collection(info) && info.product_id() == PRODUCT_ID_WIRED)
+        else {
+            return Ok(CableState::NotAttached);
+        };
+        // Opened and dropped at once, with nothing sent: this asks the operating system whether the
+        // app may use the cable, it does not talk to the mouse.
+        match candidate.open_device(&api) {
+            Ok(_) => Ok(CableState::Usable),
+            Err(HidError::IoError { error })
+                if error.kind() == std::io::ErrorKind::PermissionDenied =>
+            {
+                Ok(CableState::PermissionDenied)
+            }
+            // hidapi's Linux backend reports a refused open as a plain message rather than an
+            // io error kind, so the message is what says permission when the kind does not.
+            Err(error) if error.to_string().to_lowercase().contains("permission") => {
+                Ok(CableState::PermissionDenied)
+            }
+            Err(error) => Err(DeviceError::Io(error.to_string())),
+        }
     }
 }
 

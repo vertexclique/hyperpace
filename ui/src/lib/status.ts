@@ -18,6 +18,8 @@ export interface DeviceStatusSource {
 	connected: boolean;
 	online: boolean;
 	identity: DeviceIdentity | null;
+	/** A cable is attached that the app is not allowed to open. */
+	cableBlocked?: boolean;
 	/** The settings read from the mouse, when they have been; the polling rate comes from here. */
 	settings: { pollingHz: number } | null;
 }
@@ -88,6 +90,23 @@ export function linkDetail(device: DeviceStatusSource, inShell: boolean): string
 	const link = identity.wired ? 'Wired' : '2.4 GHz';
 	const polling = pollingLabel(device);
 	return polling ? `${link} \u00b7 ${polling}` : link;
+}
+
+/**
+ * What is wrong with the connection beyond the mouse simply being away, or null when nothing is.
+ *
+ * A cable the app cannot open is the case that matters: the mouse is plugged in, it has stopped
+ * answering through the receiver because of that, and saying "no mouse" would send someone looking
+ * for a hardware fault instead of a permission they can grant.
+ */
+export function accessWarning(device: DeviceStatusSource): string | null {
+	return device.cableBlocked ? 'Cable not permitted' : null;
+}
+
+/** The full sentence behind `accessWarning`, for a panel with room to explain. */
+export function accessWarningDetail(device: DeviceStatusSource): string | null {
+	if (!device.cableBlocked) return null;
+	return 'The mouse is plugged in by cable, but this app is not allowed to open it. Install the device access rule that comes with Hyperpace, then unplug and replug the cable.';
 }
 
 /** The tone a presence carries, for the chip that shows it. */

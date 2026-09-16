@@ -241,6 +241,10 @@ pub struct DeviceStateDto {
     pub battery: Option<BatteryDto>,
     /// Whether the device last reported itself online.
     pub online: bool,
+    /// Whether a cable is attached that this app is not allowed to open. On Linux this means the
+    /// device access rule has not been installed: the mouse is there, the app simply cannot reach
+    /// it, and while the cable is plugged in the mouse stops answering through the receiver.
+    pub cable_blocked: bool,
 }
 
 /// One event streamed to a window's `Channel`, mirroring [`DeviceEvent`].

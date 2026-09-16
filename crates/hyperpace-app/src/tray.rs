@@ -254,6 +254,7 @@ mod tests {
 
     fn state(connected: bool, online: bool) -> DeviceStateDto {
         DeviceStateDto {
+            cable_blocked: false,
             connected,
             backend: None,
             access: None,

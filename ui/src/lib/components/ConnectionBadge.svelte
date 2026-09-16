@@ -1,10 +1,19 @@
 <script lang="ts">
 	import { device, isTauriShell } from '../device.svelte';
-	import { linkDetail, presenceLabel, presenceOf, statusLine, toneOf } from '../status';
+	import {
+		accessWarning,
+		accessWarningDetail,
+		linkDetail,
+		presenceLabel,
+		presenceOf,
+		statusLine,
+		toneOf
+	} from '../status';
 
 	let presence = $derived(presenceOf(device, isTauriShell));
 	let tone = $derived(toneOf(presence));
 	let detail = $derived(linkDetail(device, isTauriShell));
+	let warning = $derived(accessWarning(device));
 </script>
 
 <!-- Two segments of the top bar's one instrument cluster (app.css .instrument/.segment): presence
@@ -17,6 +26,9 @@
 </span>
 {#if detail}
 	<span class="segment link mono">{detail}</span>
+{/if}
+{#if warning}
+	<span class="segment warning" title={accessWarningDetail(device) ?? ''}>{warning}</span>
 {/if}
 
 <style>
@@ -44,6 +56,14 @@
 
 	.tone-neutral {
 		color: var(--color-muted);
+	}
+
+	.warning {
+		font-size: var(--text-xs);
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--color-warning);
 	}
 
 	.link {

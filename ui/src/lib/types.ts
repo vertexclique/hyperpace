@@ -81,6 +81,8 @@ export interface DeviceState {
 	identity: DeviceIdentity | null;
 	battery: Battery | null;
 	online: boolean;
+	/** A cable is attached that the app is not allowed to open; the mouse is there but unreachable. */
+	cableBlocked: boolean;
 }
 
 export type DeviceEvent =

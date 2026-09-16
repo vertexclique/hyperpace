@@ -158,6 +158,8 @@ class DeviceStore {
 	access = $state<Access | null>(null);
 	/** False while a connected device is asleep/unresponsive (DeviceEvent Offline). */
 	online = $state(true);
+	/** A cable is attached that the app cannot open; see `status.ts` for what is shown. */
+	cableBlocked = $state(false);
 	identity = $state<DeviceIdentity | null>(null);
 	battery = $state<Battery | null>(null);
 
@@ -229,6 +231,7 @@ class DeviceStore {
 		this.identity = state.identity;
 		this.battery = state.battery;
 		this.online = state.online;
+		this.cableBlocked = state.cableBlocked;
 	}
 
 	/**

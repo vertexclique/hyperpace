@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { getName, getTauriVersion, getVersion } from '@tauri-apps/api/app';
 	import { device, isTauriShell } from '../device.svelte';
-	import { statusLine } from '../status';
+	import { accessWarningDetail, statusLine } from '../status';
 	import { invoke } from '../tauri';
 	import { DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT } from '../types';
 	import type { AppSettings, AppSettingsResponse, DeviceBackend, LinkType } from '../types';
@@ -220,6 +220,14 @@
 			/>
 		{:else if device.connected}
 			<p class="plate-subtitle">{statusLine(device, isTauriShell)}</p>
+
+			{#if accessWarningDetail(device)}
+				<p class="cable-warning">{accessWarningDetail(device)}</p>
+				<p class="cable-command mono">
+					sudo install -m 644 70-hyperpace.rules /usr/lib/udev/rules.d/ && sudo udevadm control
+					--reload-rules && sudo udevadm trigger --subsystem-match=hidraw
+				</p>
+			{/if}
 
 			<div class="identifiers-row">
 				<span class="field-hint">Identifiers</span>
@@ -474,6 +482,26 @@
 </div>
 
 <style>
+	/* Shown when the mouse is plugged in by cable but the operating system refuses this app access
+	   to it: the one connection problem an operator can fix themselves, so it names the fix. */
+	.cable-warning {
+		margin-top: var(--space-2xs);
+		color: var(--color-warning);
+		font-size: var(--text-sm);
+		line-height: 1.45;
+	}
+
+	.cable-command {
+		margin-top: var(--space-2xs);
+		padding: var(--space-2xs) var(--space-xs);
+		background: var(--color-paper-3);
+		border-left: 2px solid var(--color-warning);
+		color: var(--color-ink-2);
+		font-size: var(--text-xs);
+		line-height: 1.5;
+		overflow-wrap: anywhere;
+	}
+
 	.page-pad {
 		padding: 0 var(--space-lg) var(--space-lg);
 	}

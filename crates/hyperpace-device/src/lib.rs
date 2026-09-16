@@ -42,7 +42,7 @@ pub mod sim;
 pub use error::DeviceError;
 pub use event::{Access, DeviceEvent};
 pub use handle::DeviceHandle;
-pub use hid::HidTransport;
+pub use hid::{CableState, HidTransport};
 pub use hotplug::{HotplugEvent, watch};
 pub use owner::spawn;
 pub use sim::{SimController, SimTransport};
