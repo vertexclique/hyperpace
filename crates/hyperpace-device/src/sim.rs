@@ -11,7 +11,9 @@ use std::collections::{HashSet, VecDeque};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
-use hyperpace_protocol::{FRAME_LEN, Frame, PAYLOAD_LEN, Transport, TransportError, settings};
+use hyperpace_protocol::{
+    Command, FRAME_LEN, Frame, PAYLOAD_LEN, Transport, TransportError, settings,
+};
 
 /// How long [`SimTransport::recv`] sleeps when nothing is waiting, so an idle owner thread's poll
 /// loop does not busy-spin. The simulator computes every reply synchronously, so this never
@@ -332,6 +334,14 @@ impl Transport for SimTransport {
             // malformed buffer through the trait object has nothing to reply to.
             return Ok(());
         };
+        // A sleeping mouse answers nothing; only the receiver's own commands still get a reply.
+        // Without this the simulator answered everything while "offline", which is how the
+        // owner thread's requests-while-asleep bug went unnoticed until it met real hardware.
+        let receiver_answers =
+            Command::from_byte(request.command).is_some_and(Command::answered_by_receiver);
+        if !inner.online && !receiver_answers {
+            return Ok(());
+        }
         let reply = handle_request(&mut inner, &request);
         drop(inner);
         self.outbox.push_back(reply.encode());
@@ -420,6 +430,22 @@ impl SimController {
     /// already queued for an in-flight request.
     pub fn push(&self, frame: Frame) {
         lock(&self.inner).pending_pushes.push_back(frame);
+    }
+
+    /// Overwrite the simulator's flash at `address` with `data`, as though it had been programmed
+    /// before the host connected. Bytes past the end of flash are ignored.
+    ///
+    /// The flash starts erased, and an erased settings block does not decode (its polling byte is
+    /// `0xff`), so a test that asserts on what a connect sequence read has to put real values
+    /// there first or it proves nothing.
+    pub fn set_flash(&self, address: u16, data: &[u8]) {
+        let mut inner = lock(&self.inner);
+        let start = usize::from(address);
+        for (index, byte) in data.iter().enumerate() {
+            if let Some(slot) = inner.flash.get_mut(start + index) {
+                *slot = *byte;
+            }
+        }
     }
 
     /// The raw byte the simulator's own flash holds at `address`.

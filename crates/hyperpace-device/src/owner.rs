@@ -13,7 +13,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use hyperpace_protocol::{
-    Command, FRAME_LEN, Frame, Shadow, Transport, TransportError, request, response, scalar_pair,
+    Command, DeviceIdentity, FRAME_LEN, Frame, Shadow, Transport, TransportError, request,
+    response, scalar_pair,
 };
 
 use crate::error::DeviceError;
@@ -41,11 +42,20 @@ const RECV_SLICE: Duration = Duration::from_millis(50);
 /// Sends attempted per exchange before [`send_and_await`] gives up early on a `Timeout`
 /// (retries are still bounded overall by the caller's own deadline).
 const MAX_ATTEMPTS: u32 = 3;
+/// How long a command that needs the mouse waits for it to finish reconnecting before it is
+/// refused with [`DeviceError::Asleep`].
+///
+/// The mouse wakes the moment it moves, and moving it is how anyone reaches a control in the app,
+/// so a real wake (a handshake plus the 256 byte walk, well under a second) fits with room to
+/// spare. A mouse that stays asleep past this gets a clear answer instead of a request that never
+/// returns.
+const PARK_LIMIT: Duration = Duration::from_secs(5);
 
 /// Where the owner thread is in the connect sequence.
 #[derive(Clone, Copy)]
 enum ConnectPhase {
-    /// Waiting for a handshake reply carrying the device's identity.
+    /// Waiting for a handshake reply carrying the device's identity. This is also where the thread
+    /// sits while the mouse is asleep.
     Handshake,
     /// Walking the base settings block, `offset` bytes in.
     Walk { offset: u16 },
@@ -66,6 +76,108 @@ struct OwnerState {
     shadow: Shadow,
     access: Access,
     last_battery_poll: Option<Instant>,
+    /// The identity the latest handshake reported, announced as [`DeviceEvent::Connected`] only
+    /// once the walk that follows it completes.
+    identity: Option<DeviceIdentity>,
+    /// Whether `shadow` holds a complete walk. False until the first walk finishes and again after
+    /// a factory reset erases it; while false, a settings read waits instead of returning erased
+    /// bytes that decode as nonsense.
+    walked: bool,
+    /// Commands that need the mouse, received while it was not answering, oldest first, each with
+    /// the moment it arrived.
+    parked: Vec<(Instant, OwnerCommand)>,
+    /// Whether the device has pushed a change of its own since `shadow` was last read, so the
+    /// cached copy may no longer match it.
+    stale: bool,
+}
+
+impl OwnerState {
+    /// Whether `command` can be serviced right now, or must wait for the mouse.
+    ///
+    /// A write refused by read-only access is never held: the refusal does not need the device,
+    /// so the caller gets it immediately.
+    fn must_wait(&self, command: &OwnerCommand) -> bool {
+        let ready = matches!(self.phase, ConnectPhase::Ready);
+        let read_only = self.access == Access::ReadOnly;
+        match command {
+            OwnerCommand::Subscribe { .. } => false,
+            // A complete earlier walk is still an accurate copy of the mouse's flash while it
+            // naps, unless the mouse itself has since pushed a change. Serving it keeps every
+            // screen populated through the mouse's sleep instead of blanking it every few seconds;
+            // a stale copy has to wait for the mouse so it can be re-read.
+            OwnerCommand::ReadSettings { .. } => !self.walked || (self.stale && !ready),
+            OwnerCommand::Request { frame, .. } => {
+                let receiver_answers =
+                    Command::from_byte(frame.command).is_some_and(Command::answered_by_receiver);
+                let refused = read_only && is_write_command(frame.command);
+                !ready && !receiver_answers && !refused
+            }
+            OwnerCommand::ReadBlock { .. } => !ready,
+            OwnerCommand::WriteScalar { .. } | OwnerCommand::WriteBlock { .. } => {
+                !ready && !read_only
+            }
+        }
+    }
+}
+
+/// Answer `command` with `error` without touching the device.
+fn refuse(command: OwnerCommand, error: DeviceError) {
+    match command {
+        OwnerCommand::Request { reply, .. } => {
+            let _ = reply.send(Err(error));
+        }
+        OwnerCommand::ReadSettings { reply } => {
+            let _ = reply.send(Err(error));
+        }
+        OwnerCommand::ReadBlock { reply, .. } => {
+            let _ = reply.send(Err(error));
+        }
+        OwnerCommand::WriteScalar { reply, .. } | OwnerCommand::WriteBlock { reply, .. } => {
+            let _ = reply.send(Err(error));
+        }
+        // Never parked: a subscription needs nothing from the device.
+        OwnerCommand::Subscribe { .. } => {}
+    }
+}
+
+/// Service `command` now if the device can take it, or park it until it can.
+///
+/// `arrived` is when the command was first received, so a command re-dispatched from the parked
+/// list keeps its original deadline rather than getting a fresh one.
+fn dispatch(
+    command: OwnerCommand,
+    arrived: Instant,
+    transport: &mut dyn Transport,
+    state: &mut OwnerState,
+) -> Result<(), ServiceExit> {
+    if state.must_wait(&command) {
+        state.parked.push((arrived, command));
+        return Ok(());
+    }
+    handle_command(command, transport, state)
+}
+
+/// Refuse every parked command that has waited [`PARK_LIMIT`] for a mouse that never woke.
+fn expire_parked(state: &mut OwnerState) {
+    if state.parked.is_empty() {
+        return;
+    }
+    let (expired, waiting): (Vec<_>, Vec<_>) = std::mem::take(&mut state.parked)
+        .into_iter()
+        .partition(|(arrived, _)| arrived.elapsed() >= PARK_LIMIT);
+    state.parked = waiting;
+    for (_, command) in expired {
+        refuse(command, DeviceError::Asleep);
+    }
+}
+
+/// Give every parked command another chance, in arrival order, once the device may be able to take
+/// them. Whatever still cannot run goes back on the list with its original arrival time.
+fn drain_parked(transport: &mut dyn Transport, state: &mut OwnerState) -> Result<(), ServiceExit> {
+    for (arrived, command) in std::mem::take(&mut state.parked) {
+        dispatch(command, arrived, transport, state)?;
+    }
+    Ok(())
 }
 
 /// Send `event` to every live subscriber, dropping any whose receiver is gone.
@@ -76,14 +188,22 @@ fn broadcast(subscribers: &mut Vec<mpsc::Sender<DeviceEvent>>, event: DeviceEven
 /// Decode `bytes`; if it is a `StatusChanged` push, dispatch it as an event and return `None`, so
 /// a push can never be mistaken for the reply a caller is waiting on. Any other frame is handed
 /// back for the caller to match against what it expects.
-fn handle_incoming(
-    bytes: &[u8; FRAME_LEN],
-    subscribers: &mut Vec<mpsc::Sender<DeviceEvent>>,
-) -> Option<Frame> {
+fn handle_incoming(bytes: &[u8; FRAME_LEN], state: &mut OwnerState) -> Option<Frame> {
     let frame = Frame::decode(bytes).ok()?;
     if frame.command == 10 {
         if let Ok(changed) = response::status_changed(&frame) {
-            broadcast(subscribers, DeviceEvent::Changed(changed));
+            // The device changed something on its own (a DPI button press, a profile switch), so
+            // the cached copy of its settings no longer matches it. The next settings read
+            // re-reads the base block rather than answering from a copy that is now wrong.
+            // A battery-only push changes nothing the settings block holds, so it does not cost a
+            // re-read.
+            let settings_changed = changed.dpi
+                || changed.polling
+                || changed.profile
+                || changed.dpi_indicator
+                || changed.lighting;
+            state.stale |= settings_changed;
+            broadcast(&mut state.subscribers, DeviceEvent::Changed(changed));
         }
         None
     } else {
@@ -97,7 +217,7 @@ fn handle_incoming(
 /// reimplementation must reject an unsolicited frame instead of counting it as a failed attempt).
 fn send_and_await(
     transport: &mut dyn Transport,
-    subscribers: &mut Vec<mpsc::Sender<DeviceEvent>>,
+    state: &mut OwnerState,
     command: u8,
     frame: &Frame,
     timeout: Duration,
@@ -121,7 +241,7 @@ fn send_and_await(
         let remaining = deadline.saturating_duration_since(now);
         let slice = RECV_SLICE.min(remaining);
         if let Some(bytes) = transport.recv(slice)?
-            && let Some(reply) = handle_incoming(&bytes, subscribers)
+            && let Some(reply) = handle_incoming(&bytes, state)
             && reply.command == command
         {
             return Ok(reply);
@@ -147,14 +267,16 @@ fn advance_handshake(
     let frame = request::handshake([0; 4]);
     match send_and_await(
         transport,
-        &mut state.subscribers,
+        state,
         Command::Handshake as u8,
         &frame,
         CONNECT_TIMEOUT,
     ) {
         Ok(reply) => {
+            // Not announced yet: `Connected` promises the settings are readable, and they are not
+            // until the walk below completes.
             if let Ok(identity) = response::identity(&reply) {
-                broadcast(&mut state.subscribers, DeviceEvent::Connected(identity));
+                state.identity = Some(identity);
                 state.phase = ConnectPhase::Walk { offset: 0 };
             }
             Ok(())
@@ -173,6 +295,11 @@ fn advance_walk(
 ) -> Result<(), ServiceExit> {
     if offset >= WALK_LEN {
         state.phase = ConnectPhase::Ready;
+        state.walked = true;
+        state.stale = false;
+        if let Some(identity) = state.identity {
+            broadcast(&mut state.subscribers, DeviceEvent::Connected(identity));
+        }
         // Force an immediate battery poll now that the walk is done.
         state.last_battery_poll = None;
         return Ok(());
@@ -182,7 +309,7 @@ fn advance_walk(
     let frame = request::read_flash(offset, len as u8);
     match send_and_await(
         transport,
-        &mut state.subscribers,
+        state,
         Command::ReadFlash as u8,
         &frame,
         CONNECT_TIMEOUT,
@@ -209,7 +336,7 @@ fn advance_walk(
 fn poll_battery(transport: &mut dyn Transport, state: &mut OwnerState) -> Result<(), ServiceExit> {
     let online_reply = send_and_await(
         transport,
-        &mut state.subscribers,
+        state,
         Command::Online as u8,
         &Command::Online.request(),
         POLL_TIMEOUT,
@@ -228,7 +355,7 @@ fn poll_battery(transport: &mut dyn Transport, state: &mut OwnerState) -> Result
 
     match send_and_await(
         transport,
-        &mut state.subscribers,
+        state,
         Command::Battery as u8,
         &Command::Battery.request(),
         POLL_TIMEOUT,
@@ -251,8 +378,7 @@ fn poll_battery(transport: &mut dyn Transport, state: &mut OwnerState) -> Result
 /// mirrors every chunk that already succeeded.
 fn write_block(
     transport: &mut dyn Transport,
-    subscribers: &mut Vec<mpsc::Sender<DeviceEvent>>,
-    shadow: &mut Shadow,
+    state: &mut OwnerState,
     address: u16,
     data: &[u8],
 ) -> Result<(), DeviceError> {
@@ -263,12 +389,12 @@ fn write_block(
         let frame = request::write_flash(chunk_address, chunk)?;
         send_and_await(
             transport,
-            subscribers,
+            state,
             Command::WriteFlash as u8,
             &frame,
             WRITE_TIMEOUT,
         )?;
-        shadow.apply_read(chunk_address, chunk);
+        state.shadow.apply_read(chunk_address, chunk);
     }
     Ok(())
 }
@@ -279,8 +405,7 @@ fn write_block(
 /// reaches the caller, matching `write_block`'s own "stops at the first chunk that fails" note.
 fn read_block(
     transport: &mut dyn Transport,
-    subscribers: &mut Vec<mpsc::Sender<DeviceEvent>>,
-    shadow: &mut Shadow,
+    state: &mut OwnerState,
     address: u16,
     len: usize,
 ) -> Result<Vec<u8>, DeviceError> {
@@ -294,13 +419,13 @@ fn read_block(
         let frame = request::read_flash(chunk_address, chunk_len_byte);
         let reply = send_and_await(
             transport,
-            subscribers,
+            state,
             Command::ReadFlash as u8,
             &frame,
             WRITE_TIMEOUT,
         )?;
         let data = &reply.payload[..chunk_len];
-        shadow.apply_read(chunk_address, data);
+        state.shadow.apply_read(chunk_address, data);
         out.extend_from_slice(data);
         offset += chunk_len;
     }
@@ -323,18 +448,13 @@ fn service_request(
         return Ok(());
     }
     let command_byte = frame.command;
-    let result = send_and_await(
-        transport,
-        &mut state.subscribers,
-        command_byte,
-        &frame,
-        timeout,
-    );
+    let result = send_and_await(transport, state, command_byte, &frame, timeout);
     if let Ok(reply_frame) = &result
         && command_byte == Command::FactoryReset as u8
         && reply_frame.status() != hyperpace_protocol::Status::Unsupported
     {
         state.shadow = Shadow::new();
+        state.walked = false;
         state.phase = ConnectPhase::Walk { offset: 0 };
     }
     let disconnected = matches!(result, Err(DeviceError::Disconnected));
@@ -353,13 +473,7 @@ fn service_read_block(
     len: usize,
     reply: &mpsc::Sender<Result<Vec<u8>, DeviceError>>,
 ) -> Result<(), ServiceExit> {
-    let result = read_block(
-        transport,
-        &mut state.subscribers,
-        &mut state.shadow,
-        address,
-        len,
-    );
+    let result = read_block(transport, state, address, len);
     let disconnected = matches!(result, Err(DeviceError::Disconnected));
     let _ = reply.send(result);
     if disconnected {
@@ -388,6 +502,21 @@ fn handle_command(
             reply,
         } => service_request(transport, state, frame, timeout, &reply)?,
         OwnerCommand::ReadSettings { reply } => {
+            if state.stale {
+                // The device pushed a change of its own since the cache was filled: re-read the
+                // base block so this answer is what the mouse holds now, not what it held then.
+                match read_block(transport, state, 0, usize::from(WALK_LEN)) {
+                    Ok(_) => state.stale = false,
+                    Err(DeviceError::Disconnected) => {
+                        let _ = reply.send(Err(DeviceError::Disconnected));
+                        return Err(ServiceExit::Disconnected);
+                    }
+                    Err(error) => {
+                        let _ = reply.send(Err(error));
+                        return Ok(());
+                    }
+                }
+            }
             let _ = reply.send(Ok(state.shadow.clone()));
         }
         OwnerCommand::ReadBlock {
@@ -407,7 +536,7 @@ fn handle_command(
             let frame = request::set_scalar(address, value);
             let result = send_and_await(
                 transport,
-                &mut state.subscribers,
+                state,
                 Command::WriteFlash as u8,
                 &frame,
                 WRITE_TIMEOUT,
@@ -435,13 +564,7 @@ fn handle_command(
                 let _ = reply.send(Err(DeviceError::ReadOnly));
                 return Ok(());
             }
-            let result = write_block(
-                transport,
-                &mut state.subscribers,
-                &mut state.shadow,
-                address,
-                &data,
-            );
+            let result = write_block(transport, state, address, &data);
             let disconnected = matches!(result, Err(DeviceError::Disconnected));
             let _ = reply.send(result);
             if disconnected {
@@ -461,12 +584,17 @@ fn run(mut transport: Box<dyn Transport>, access: Access, commands: &Receiver<Ow
         shadow: Shadow::new(),
         access,
         last_battery_poll: None,
+        identity: None,
+        walked: false,
+        parked: Vec::new(),
+        stale: false,
     };
 
     loop {
+        expire_parked(&mut state);
         match commands.try_recv() {
             Ok(command) => {
-                if handle_command(command, transport.as_mut(), &mut state).is_err() {
+                if dispatch(command, Instant::now(), transport.as_mut(), &mut state).is_err() {
                     broadcast(&mut state.subscribers, DeviceEvent::Disconnected);
                     return;
                 }
@@ -488,7 +616,7 @@ fn run(mut transport: Box<dyn Transport>, access: Access, commands: &Receiver<Ow
             }
             ConnectPhase::Ready => match transport.recv(IDLE_SLICE) {
                 Ok(Some(bytes)) => {
-                    handle_incoming(&bytes, &mut state.subscribers);
+                    handle_incoming(&bytes, &mut state);
                     Ok(())
                 }
                 Ok(None) | Err(TransportError::Io(_)) => Ok(()),
@@ -496,6 +624,16 @@ fn run(mut transport: Box<dyn Transport>, access: Access, commands: &Receiver<Ow
             },
         };
 
+        let outcome = outcome.and_then(|()| {
+            if matches!(state.phase, ConnectPhase::Ready) {
+                drain_parked(transport.as_mut(), &mut state)
+            } else {
+                Ok(())
+            }
+        });
+
+        // Parked replies are dropped with `state` on the way out, which every waiting caller sees
+        // as `DeviceError::Disconnected`.
         if outcome.is_err() {
             broadcast(&mut state.subscribers, DeviceEvent::Disconnected);
             return;
@@ -537,6 +675,156 @@ mod tests {
 
     fn expect_event(events: &mpsc::Receiver<DeviceEvent>) -> DeviceEvent {
         events.recv_timeout(TEST_TIMEOUT).unwrap()
+    }
+
+    /// The polling scalar pair an 8000 Hz mouse stores: code 64 and its `0x55 - code` complement.
+    /// These are the exact bytes read off a real device, not a made-up fixture.
+    const POLLING_8K: [u8; 2] = [0x40, 0x15];
+
+    /// Wait up to `limit` for the first event matching `wanted`, skipping any others.
+    fn wait_for(
+        events: &mpsc::Receiver<DeviceEvent>,
+        limit: Duration,
+        wanted: impl Fn(&DeviceEvent) -> bool,
+    ) -> DeviceEvent {
+        let deadline = Instant::now() + limit;
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            assert!(!remaining.is_zero(), "the expected event never arrived");
+            if let Ok(event) = events.recv_timeout(remaining)
+                && wanted(&event)
+            {
+                return event;
+            }
+        }
+    }
+
+    /// Connect a simulated mouse, then put it to sleep and wait until the owner thread has noticed.
+    /// The battery poll is what notices, so this takes up to one poll interval.
+    fn asleep_handle() -> (
+        DeviceHandle,
+        crate::sim::SimController,
+        mpsc::Receiver<DeviceEvent>,
+    ) {
+        let (transport, controller) = SimTransport::new(62, 1, 4);
+        controller.set_flash(offset::POLLING, &POLLING_8K);
+        let handle = spawn(Box::new(transport), Access::ReadWrite).unwrap();
+        let events = handle.events();
+        wait_for(&events, TEST_TIMEOUT, |event| {
+            matches!(event, DeviceEvent::Connected(_))
+        });
+        controller.set_online(false);
+        wait_for(&events, BATTERY_INTERVAL * 2, |event| {
+            matches!(event, DeviceEvent::Offline)
+        });
+        (handle, controller, events)
+    }
+
+    #[test]
+    fn connected_is_announced_only_once_the_settings_are_readable() {
+        // The real defect: `Connected` used to fire straight after the handshake, a settings read
+        // made on that event got the erased shadow, and the polling byte 0xff failed to decode.
+        let (transport, controller) = SimTransport::new(62, 1, 4);
+        controller.set_flash(offset::POLLING, &POLLING_8K);
+        let handle = spawn(Box::new(transport), Access::ReadOnly).unwrap();
+        let events = handle.events();
+        wait_for(&events, TEST_TIMEOUT, |event| {
+            matches!(event, DeviceEvent::Connected(_))
+        });
+
+        let shadow = handle.read_settings().unwrap();
+        assert_eq!(shadow.scalar(offset::POLLING), 0x40);
+    }
+
+    #[test]
+    fn a_settings_read_made_before_the_walk_finishes_waits_for_it() {
+        let (transport, controller) = SimTransport::new(62, 1, 4);
+        controller.set_flash(offset::POLLING, &POLLING_8K);
+        let handle = spawn(Box::new(transport), Access::ReadOnly).unwrap();
+        // No wait for `Connected`: this races the connect sequence on purpose.
+        let shadow = handle.read_settings().unwrap();
+        assert_eq!(shadow.scalar(offset::POLLING), 0x40);
+    }
+
+    #[test]
+    fn a_request_made_while_the_mouse_sleeps_is_served_once_it_wakes() {
+        let (handle, controller, _events) = asleep_handle();
+
+        let requester = handle.clone();
+        let pending = thread::spawn(move || {
+            requester.request(Command::GetProfile.request(), Duration::from_millis(300))
+        });
+
+        // Held, not timed out: nothing comes back well past the request's own 300 ms timeout.
+        let held_until = Instant::now() + Duration::from_millis(900);
+        while Instant::now() < held_until {
+            assert!(
+                !pending.is_finished(),
+                "the request did not wait for the mouse"
+            );
+            thread::park_timeout(Duration::from_millis(20));
+        }
+
+        controller.set_online(true);
+        let reply = pending.join().unwrap().unwrap();
+        assert_eq!(reply.command, Command::GetProfile as u8);
+    }
+
+    #[test]
+    fn the_receivers_own_commands_are_answered_while_the_mouse_sleeps() {
+        // Pairing depends on this: a mouse being paired has never answered this receiver.
+        let (handle, _controller, _events) = asleep_handle();
+        let reply = handle
+            .request(Command::GetReceiverLight.request(), TEST_TIMEOUT)
+            .unwrap();
+        assert_eq!(reply.command, Command::GetReceiverLight as u8);
+    }
+
+    #[test]
+    fn a_request_for_a_mouse_that_never_wakes_is_refused_as_asleep() {
+        let (handle, _controller, _events) = asleep_handle();
+        assert_eq!(
+            handle.request(Command::GetProfile.request(), Duration::from_millis(300)),
+            Err(DeviceError::Asleep)
+        );
+    }
+
+    #[test]
+    fn a_change_made_on_the_mouse_shows_up_in_the_next_settings_read() {
+        // The operator's report: press a button on the mouse, and the app must show the new value.
+        let (transport, controller) = SimTransport::new(62, 1, 4);
+        controller.set_flash(offset::POLLING, &POLLING_8K);
+        let handle = spawn(Box::new(transport), Access::ReadOnly).unwrap();
+        let events = handle.events();
+        wait_for(&events, TEST_TIMEOUT, |event| {
+            matches!(event, DeviceEvent::Connected(_))
+        });
+        assert_eq!(
+            handle.read_settings().unwrap().scalar(offset::POLLING),
+            0x40
+        );
+
+        // The mouse switches itself to 1000 Hz (code 1, complement 0x54) and says so.
+        controller.set_flash(offset::POLLING, &[0x01, 0x54]);
+        let mut push = Frame::command(10);
+        push.payload[0] = 0x02;
+        push.length = 1;
+        controller.push(push);
+        wait_for(&events, TEST_TIMEOUT, |event| {
+            matches!(event, DeviceEvent::Changed(_))
+        });
+
+        assert_eq!(
+            handle.read_settings().unwrap().scalar(offset::POLLING),
+            0x01
+        );
+    }
+
+    #[test]
+    fn settings_stay_readable_while_the_mouse_sleeps() {
+        let (handle, _controller, _events) = asleep_handle();
+        let shadow = handle.read_settings().unwrap();
+        assert_eq!(shadow.scalar(offset::POLLING), 0x40);
     }
 
     #[test]

@@ -13,6 +13,14 @@
 //! A reimplementation must clamp reads to the slot's geometry rather than trust the device's own
 //! count byte, which is uncapped on the wire (section 8.4): [`Keystroke::decode`] only ever reads
 //! as many entries as fit in the slice it is given.
+//!
+//! A slot no writer has ever touched reads back as 0xFF, the erased-flash fill byte this protocol
+//! uses everywhere a region has never been written (sections 8.7, 11.1, 11.3): the full flash
+//! shadow, a macro's padded name, and an unprogrammed macro's status byte all read 0xFF for
+//! "nothing here". A count byte of 0xFF can never come from a real write (every writer emits an
+//! even `2k`, and the keymap bounds `k` to 8 modifiers plus one key plus one media, section
+//! 8.5/8.6, nowhere near 255), so [`Keystroke::decode`] reads it as an unbound slot rather than
+//! attempting to parse entries out of erased flash.
 
 use crate::encoding::struct_check;
 use crate::response::ProtocolError;
@@ -133,12 +141,17 @@ impl Keystroke {
     /// # Errors
     ///
     /// Returns [`ProtocolError::Truncated`] when `bytes` is empty or too short for the entry
-    /// count it declares, and [`ProtocolError::InvalidValue`] when an entry's kind is not one
-    /// this slot format defines, or a modifier entry's value is not a single documented bit.
+    /// count it declares, and [`ProtocolError::UnknownByte`] when an entry's kind is not one this
+    /// slot format defines, or a modifier entry's value is not a single documented bit. A count
+    /// byte of 0xFF (an unwritten slot, see the module docs) is not an error: it decodes as
+    /// [`Keystroke::default`], no keystroke bound.
     pub fn decode(bytes: &[u8]) -> Result<Self, ProtocolError> {
         let &count = bytes
             .first()
             .ok_or(ProtocolError::Truncated { needed: 1, got: 0 })?;
+        if count == 0xff {
+            return Ok(Self::default());
+        }
         let k = usize::from(count / 2).min(bytes.len().saturating_sub(1) / 3);
 
         let mut modifiers = Vec::new();
@@ -154,17 +167,20 @@ impl Keystroke {
             let value = u16::from(entry[1]) | (u16::from(entry[2]) << 8);
             match kind {
                 KIND_MODIFIER => {
-                    let modifier =
-                        Modifier::from_bit(value).ok_or(ProtocolError::InvalidValue {
-                            field: "keystroke modifier",
-                        })?;
+                    let modifier = Modifier::from_bit(value).ok_or(ProtocolError::UnknownByte {
+                        field: "keystroke modifier",
+                        byte: entry[0],
+                        offset: base,
+                    })?;
                     modifiers.push(modifier);
                 }
                 KIND_KEY => key = Some((value & 0xff) as u8),
                 KIND_MEDIA => media = Some(value),
                 _ => {
-                    return Err(ProtocolError::InvalidValue {
+                    return Err(ProtocolError::UnknownByte {
                         field: "keystroke entry kind",
+                        byte: entry[0],
+                        offset: base,
                     });
                 }
             }
@@ -232,11 +248,42 @@ mod tests {
 
     #[test]
     fn decode_clamps_to_the_given_slice_instead_of_trusting_the_count_byte() {
-        // A device-supplied count of 255 (uncapped, section 8.4) must not read past a 32-byte slot.
-        let mut slot = vec![0xffu8; 32];
-        slot[0] = 255;
-        // Must not panic and must not read past the slice.
+        // A device-supplied count of 200 (uncapped, section 8.4), paired with a slot far too
+        // short for 100 entries, must not read past the slice or panic.
+        let mut slot = vec![0u8; 32];
+        slot[0] = 200;
         let _ = Keystroke::decode(&slot);
+    }
+
+    #[test]
+    fn a_never_written_slot_reads_0xff_and_decodes_as_no_keystroke_bound() {
+        // The real defect: a button whose keystroke slot the writer never touched reads back as
+        // the device's erased-flash fill byte on every position, 0xFF (sections 8.7, 11.1, 11.3),
+        // starting with the count byte. This must not be mistaken for a malformed record.
+        let slot = vec![0xffu8; 32];
+        assert_eq!(Keystroke::decode(&slot), Ok(Keystroke::default()));
+    }
+
+    #[test]
+    fn a_bare_0xff_count_byte_also_decodes_as_no_keystroke_bound() {
+        // The writer never pads the slot (module docs): a short read of just the count byte from
+        // an unwritten slot must decode the same way as a full 32-byte read of one.
+        assert_eq!(Keystroke::decode(&[0xff]), Ok(Keystroke::default()));
+    }
+
+    #[test]
+    fn an_unrecognized_entry_kind_names_the_byte_and_offset() {
+        // count=2 (one entry), kind 3 is not modifier/key/media and is not the 0xFF sentinel:
+        // this is a genuinely unknown byte, not an unwritten slot, and must say so precisely.
+        let slot = [0x02, 0x83, 0x11, 0x22, 0x00];
+        assert_eq!(
+            Keystroke::decode(&slot),
+            Err(ProtocolError::UnknownByte {
+                field: "keystroke entry kind",
+                byte: 0x83,
+                offset: 1,
+            })
+        );
     }
 
     #[test]

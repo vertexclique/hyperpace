@@ -100,6 +100,13 @@ impl Shadow {
         }
     }
 
+    /// The whole shadow as raw bytes, for saving a snapshot of a real device to test the decoder
+    /// against offline.
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        self.data.as_slice()
+    }
+
     /// Apply a `ReadFlashData` reply's bytes at `address`.
     ///
     /// Bytes that would land at or past [`SHADOW_LEN`] are dropped rather than aliased, unlike

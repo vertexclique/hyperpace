@@ -77,8 +77,9 @@ impl HidTransport {
 /// Map a hidapi error to the coarser [`TransportError`] the rest of this crate reasons about.
 ///
 /// hidapi has no dedicated "the device was unplugged" variant, so this leans on the [`std::io`]
-/// error kind the native backends surface for a device that is gone. Unverified against real
-/// hardware, since this crate never opens the operator's own device (workspace rule); a kind this
+/// error kind the native backends surface for a device that is gone. Opening and reading from the
+/// operator's own device has been exercised by hand (see the crate docs), but this mapping has
+/// not: doing so means unplugging the device mid-session, which nothing here has done. A kind this
 /// does not recognize falls back to a generic, non-fatal [`TransportError::Io`].
 fn map_hid_error(error: &HidError) -> TransportError {
     if let HidError::IoError { error: io_error } = error {

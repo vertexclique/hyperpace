@@ -82,6 +82,29 @@ impl Command {
         }
     }
 
+    /// Whether the receiver answers this command on its own, without relaying it to the mouse.
+    ///
+    /// A sleeping mouse answers nothing, but its receiver stays powered on the USB bus and keeps
+    /// answering the commands it owns: the online probe, pairing, its indicator light and its own
+    /// version. Everything else is relayed to the mouse and gets no reply until it wakes. The
+    /// owner thread uses this to decide which requests must wait for the mouse, and the simulator
+    /// uses it to stay silent the way a sleeping mouse does, so the two cannot disagree.
+    ///
+    /// Pairing is the case that makes this matter: a mouse being paired has never handshaken with
+    /// this receiver, so a pairing request held until the mouse answered would never be sent.
+    #[must_use]
+    pub fn answered_by_receiver(self) -> bool {
+        matches!(
+            self,
+            Self::Online
+                | Self::EnterPair
+                | Self::PairState
+                | Self::SetReceiverLight
+                | Self::GetReceiverLight
+                | Self::GetReceiverVersion
+        )
+    }
+
     /// A bare request frame carrying only this command, empty payload.
     #[must_use]
     pub fn request(self) -> Frame {
@@ -94,6 +117,30 @@ mod tests {
     #![allow(clippy::unwrap_used)]
 
     use super::*;
+
+    #[test]
+    fn only_the_receivers_own_commands_are_answered_without_the_mouse() {
+        for command in [
+            Command::Online,
+            Command::EnterPair,
+            Command::PairState,
+            Command::SetReceiverLight,
+            Command::GetReceiverLight,
+            Command::GetReceiverVersion,
+        ] {
+            assert!(command.answered_by_receiver(), "{command:?}");
+        }
+        for command in [
+            Command::Handshake,
+            Command::Battery,
+            Command::ReadFlash,
+            Command::WriteFlash,
+            Command::GetProfile,
+            Command::GetLongRange,
+        ] {
+            assert!(!command.answered_by_receiver(), "{command:?}");
+        }
+    }
 
     #[test]
     fn every_documented_byte_round_trips_through_from_byte() {

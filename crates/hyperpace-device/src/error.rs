@@ -12,6 +12,9 @@ pub enum DeviceError {
     ReadOnly,
     /// No matching reply arrived before the caller's deadline.
     Timeout,
+    /// The request needs the mouse, and the mouse stayed asleep for as long as the request was
+    /// allowed to wait for it. The receiver is still connected; moving the mouse wakes it.
+    Asleep,
     /// The transport reported the device unreachable (closed, unplugged, or the owner thread
     /// already exited).
     Disconnected,
@@ -27,7 +30,8 @@ impl fmt::Display for DeviceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ReadOnly => write!(f, "the device connection is read-only"),
-            Self::Timeout => write!(f, "no reply from the device before the deadline"),
+            Self::Timeout => write!(f, "the mouse did not answer in time; try again"),
+            Self::Asleep => write!(f, "the mouse is asleep; move it to wake it, then try again"),
             Self::Disconnected => write!(f, "the device is disconnected"),
             Self::Io(message) => write!(f, "device I/O error: {message}"),
             Self::InvalidWrite(message) => write!(f, "invalid write: {message}"),
@@ -82,7 +86,11 @@ mod tests {
         );
         assert_eq!(
             DeviceError::Timeout.to_string(),
-            "no reply from the device before the deadline"
+            "the mouse did not answer in time; try again"
+        );
+        assert_eq!(
+            DeviceError::Asleep.to_string(),
+            "the mouse is asleep; move it to wake it, then try again"
         );
     }
 }

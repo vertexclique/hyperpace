@@ -35,6 +35,18 @@ pub enum ProtocolError {
         /// Name of the field that held the bad value.
         field: &'static str,
     },
+    /// A field held a byte this codec has no mapping for, at a known offset into the record that
+    /// was being decoded. Distinct from [`Self::InvalidValue`] in that the byte and its position
+    /// are worth reporting: a genuinely unrecognized value (not a documented fill or sentinel
+    /// byte) that the next person may need to look up against the device dump.
+    UnknownByte {
+        /// Name of the field that held the byte.
+        field: &'static str,
+        /// The byte that had no mapping.
+        byte: u8,
+        /// Its offset into the record `field` was decoded from.
+        offset: usize,
+    },
     /// A macro name was empty or longer than [`crate::macros::MAX_NAME_LEN`] bytes.
     NameTooLong {
         /// The name's actual UTF-8 byte length.
@@ -75,6 +87,16 @@ impl fmt::Display for ProtocolError {
                 write!(f, "needed at least {needed} bytes, got {got}")
             }
             Self::InvalidValue { field } => write!(f, "invalid value in field {field}"),
+            Self::UnknownByte {
+                field,
+                byte,
+                offset,
+            } => {
+                write!(
+                    f,
+                    "unknown byte 0x{byte:02x} in field {field} at offset {offset}"
+                )
+            }
             Self::NameTooLong { len } => {
                 write!(f, "a macro name must be 1 to 30 UTF-8 bytes, got {len}")
             }
