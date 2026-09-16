@@ -43,7 +43,7 @@
 <div class="field">
 	<div class="field-row">
 		<label class="field-label" for={uid}>{label}</label>
-		<span class="range-value mono">{unknown ? '-' : `${value}${unit}`}</span>
+		<span class="range-value mono" class:unknown>{unknown ? '-' : `${value}${unit}`}</span>
 	</div>
 	{#if hint}<div class="field-hint">{hint}</div>{/if}
 	<input
@@ -59,8 +59,19 @@
 </div>
 
 <style>
+	/* The device's current value, so it carries the accent (design.md "Theme": accent appears
+	   only on a live value, focus, and one primary action per screen). An unread field forces
+	   `unknown`, which shows the em dash in the ordinary label color instead, never accented. */
 	.range-value {
 		font-size: var(--text-xs);
+		font-weight: 600;
+		color: var(--color-accent);
+	}
+
+	/* No real reading: the em dash stays in the ordinary muted tone, never the accent, so an
+	   unread field is never mistaken for a live value (design.md "Per-screen allowances"). */
+	.range-value.unknown {
+		font-weight: 500;
 		color: var(--color-muted);
 	}
 
@@ -76,16 +87,21 @@
 	}
 
 	input[type='range']::-webkit-slider-runnable-track {
-		height: 3px;
+		height: 4px;
 		background: var(--color-rule);
 	}
 
 	input[type='range']::-webkit-slider-thumb {
 		appearance: none;
-		width: 12px;
-		height: 12px;
-		margin-top: -4.5px;
+		width: 14px;
+		height: 14px;
+		margin-top: -5px;
 		background: var(--color-accent);
+		transition: background var(--dur-settle) var(--ease-out);
+	}
+
+	input[type='range']:hover:not(:disabled)::-webkit-slider-thumb {
+		background: var(--color-focus);
 	}
 
 	input[type='range']:disabled::-webkit-slider-thumb {
@@ -93,15 +109,20 @@
 	}
 
 	input[type='range']::-moz-range-track {
-		height: 3px;
+		height: 4px;
 		background: var(--color-rule);
 	}
 
 	input[type='range']::-moz-range-thumb {
-		width: 12px;
-		height: 12px;
+		width: 14px;
+		height: 14px;
 		background: var(--color-accent);
 		border: none;
+		transition: background var(--dur-settle) var(--ease-out);
+	}
+
+	input[type='range']:hover:not(:disabled)::-moz-range-thumb {
+		background: var(--color-focus);
 	}
 
 	input[type='range']:disabled::-moz-range-thumb {

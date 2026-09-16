@@ -117,15 +117,19 @@
 	</aside>
 
 	<section class="editor-column">
-		{#if !draft}
-			<div class="plate editor-plate empty-plate">
+		<div class="plate editor-plate">
+			<div class="plate-head">
+				<div class="plate-title-group">
+					{#if draft}<span class="plate-stub"></span>{/if}
+					<span class="plate-title">Macro editor</span>
+				</div>
+			</div>
+			{#if !draft}
 				<EmptyState
 					title="No macro selected"
 					message="Pick a macro from the library or create a new one to start editing."
 				/>
-			</div>
-		{:else}
-			<div class="plate editor-plate">
+			{:else}
 				<div class="field-row">
 					<div class="field name-field">
 						<label class="field-label" for="macro-name">Name</label>
@@ -233,8 +237,8 @@
 				{#if device.lastError}
 					<p class="field-hint error-text">{device.lastError}</p>
 				{/if}
-			</div>
-		{/if}
+			{/if}
+		</div>
 	</section>
 </div>
 
@@ -332,18 +336,6 @@
 	.editor-column {
 		flex: 1;
 		min-width: 420px;
-	}
-
-	/* Framed like every other panel instead of a bare dashed rectangle floating on the paper
-	   ground (the nested dashed box is EmptyState's own, same as Firmware and Settings use it
-	   inside a plate). Bounded rather than stretched to the column's full width: a short message
-	   filling the whole remaining width would read as emptier, not less empty. */
-	.empty-plate {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		max-width: 560px;
-		min-height: 300px;
 	}
 
 	.name-field {

@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { getName, getTauriVersion, getVersion } from '@tauri-apps/api/app';
 	import { device, isTauriShell } from '../device.svelte';
+	import { statusLine } from '../status';
 	import { invoke } from '../tauri';
 	import { DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT } from '../types';
 	import type { AppSettings, AppSettingsResponse, DeviceBackend, LinkType } from '../types';
@@ -9,6 +10,9 @@
 	import Toggle from '../components/Toggle.svelte';
 	import RangeField from '../components/RangeField.svelte';
 	import SelectField from '../components/SelectField.svelte';
+	import SegmentDial from '../controls/SegmentDial.svelte';
+
+	const PROFILE_OPTIONS = Array.from({ length: 8 }, (_, i) => ({ value: i, label: String(i) }));
 
 	// The app's own fallback when a preference has never been written (matches
 	// `extractAppSettings` in device.svelte.ts and the Rust side's own defaults), not a device
@@ -51,6 +55,8 @@
 	let importing = $state(false);
 	let configFileInput = $state<HTMLInputElement | null>(null);
 	let hasData = $derived(device.settings !== null);
+	let otherDevices = $derived(device.devices.filter((d) => d.backend !== device.backend));
+	let profileUnknown = $derived(!hasData || device.settings?.profile.state === 'unsupported');
 
 	let gpuWorkaround = $state<GpuWorkaroundValue>('auto');
 	let gpuWorkaroundSaving = $state(false);
@@ -100,17 +106,29 @@
 		if (!appDraft) return;
 		appSaving = true;
 		try {
-			await device.writeAppSettings(appDraft);
+			// minimizeToTray has no control on this screen any more (closing the window always
+			// keeps the app in the tray now), so this never writes back a preference the operator
+			// cannot see or change here.
+			const patch: Partial<AppSettings> = {
+				autostart: appDraft.autostart,
+				lowBatteryThresholdPercent: appDraft.lowBatteryThresholdPercent,
+				firmwareWatchEnabled: appDraft.firmwareWatchEnabled
+			};
+			await device.writeAppSettings(patch);
 			appDirty = false;
 		} finally {
 			appSaving = false;
 		}
 	}
 
-	async function switchProfile() {
+	async function switchProfile(index: number) {
+		const previous = profileIndex;
+		profileIndex = index;
 		profileSaving = true;
 		try {
-			await device.setProfile(profileIndex);
+			await device.setProfile(index);
+		} catch {
+			profileIndex = previous;
 		} finally {
 			profileSaving = false;
 		}
@@ -192,31 +210,43 @@
 		<div class="plate-head">
 			<h2 class="plate-title">Device</h2>
 		</div>
-		<p class="plate-subtitle">Connect to a Hyperpace mouse to read and edit its settings.</p>
 
 		{#if !isTauriShell}
+			<p class="plate-subtitle">Connect to a Hyperpace mouse to read and edit its settings.</p>
 			<EmptyState
 				title="Preview mode"
 				message="This build is not running inside the Hyperpace desktop app, so no device commands are available."
 			/>
 		{:else if device.connected}
-			<div class="field-row">
-				<div>
-					<div class="field-label">Connected</div>
-					<div class="field-hint">
-						{#if device.identity}
-							cid <span class="mono">{device.identity.cid}</span>, mid
-							<span class="mono">{device.identity.mid}</span>, link {formatLinkType(
-								device.identity.link
-							)}
-						{:else}
-							Identity not read yet.
-						{/if}
-					</div>
-				</div>
+			<p class="plate-subtitle">{statusLine(device, isTauriShell)}</p>
+
+			<div class="identifiers-row">
+				<span class="field-hint">Identifiers</span>
+				<span class="field-hint mono">
+					{#if device.identity}
+						cid {device.identity.cid} &middot; mid {device.identity.mid} &middot; link {formatLinkType(
+							device.identity.link
+						)} &middot; {device.backend === 'simulator' ? 'simulator' : 'real device'}
+					{:else}
+						not read yet
+					{/if}
+				</span>
+			</div>
+
+			<div class="field-row device-actions">
 				<button class="btn btn-danger" onclick={() => device.disconnect()}>Disconnect</button>
+				{#each otherDevices as d (d.backend)}
+					<button
+						class="btn"
+						disabled={connectingBackend !== null}
+						onclick={() => connectTo(d.backend)}
+					>
+						{connectingBackend === d.backend ? 'Connecting...' : `Use ${d.label}`}
+					</button>
+				{/each}
 			</div>
 		{:else}
+			<p class="plate-subtitle">Connect to a Hyperpace mouse to read and edit its settings.</p>
 			<div class="field-row">
 				<span class="field-hint">{device.devices.length} connection option(s).</span>
 				<button class="btn" disabled={device.scanning} onclick={() => device.refreshDevices()}>
@@ -252,39 +282,37 @@
 			<h2 class="plate-title">Profile</h2>
 		</div>
 		<p class="plate-subtitle">
-			Switch the device's active on-board profile.
+			Pick the device's active on-board profile.
 			{#if !device.connected}
 				<span class="caption-note">No mouse connected.</span>
 			{:else if device.settings?.profile.state === 'unsupported'}
 				<span class="caption-note">Not supported on this device.</span>
 			{/if}
 		</p>
-		<div class="field-row">
-			<input
-				class="text-input mono"
-				type="number"
-				min="0"
-				max="7"
-				style="width:80px"
-				disabled={!hasData || device.settings?.profile.state === 'unsupported'}
-				value={hasData ? profileIndex : ''}
-				oninput={(e) => (profileIndex = Number((e.target as HTMLInputElement).value))}
+		<div class="dial-field">
+			<SegmentDial
+				values={PROFILE_OPTIONS}
+				value={profileIndex}
+				ariaLabel="Active profile"
+				unknown={profileUnknown}
+				disabled={profileSaving}
+				size="default"
+				centerLabel={String(profileIndex)}
+				onchange={switchProfile}
 			/>
-			<button
-				class="btn btn-primary"
-				disabled={!hasData || device.settings?.profile.state === 'unsupported' || profileSaving}
-				onclick={switchProfile}
-			>
-				{profileSaving ? 'Switching...' : 'Switch profile'}
-			</button>
+			<p class="field-hint">
+				{#if profileSaving}
+					Switching...
+				{:else if hasData && device.settings?.profile.state === 'active'}
+					Currently profile <span class="mono">{profileIndex}</span>.
+				{:else}
+					Currently: -
+				{/if}
+			</p>
 		</div>
-		<p class="field-hint">
-			{#if hasData && device.settings?.profile.state === 'active'}
-				Currently profile <span class="mono">{device.settings.profile.index}</span>.
-			{:else}
-				Currently: -
-			{/if}
-		</p>
+		{#if device.lastError}
+			<p class="field-hint error-text">{device.lastError}</p>
+		{/if}
 	</section>
 
 	<section class="plate">
@@ -358,50 +386,47 @@
 				<span class="caption-note">Not available in preview mode.</span>
 			{/if}
 		</p>
-		<div class="pref-grid">
-			<Toggle
-				label="Launch at login"
-				checked={appDraft.autostart}
-				disabled={!isTauriShell}
-				onchange={(v) => {
-					appDraft.autostart = v;
-					appDirty = true;
-				}}
-			/>
-			<Toggle
-				label="Minimize to tray on close"
-				checked={appDraft.minimizeToTray}
-				disabled={!isTauriShell}
-				onchange={(v) => {
-					appDraft.minimizeToTray = v;
-					appDirty = true;
-				}}
-			/>
-			<Toggle
-				label="Watch for firmware publication"
-				hint="Checks the vendor's own config files and firmware directory paths at app start and periodically; never downloads or installs anything."
-				checked={appDraft.firmwareWatchEnabled}
-				disabled={!isTauriShell}
-				onchange={(v) => {
-					appDraft.firmwareWatchEnabled = v;
-					appDirty = true;
-				}}
-			/>
-			<RangeField
-				label="Low battery warning"
-				unit="%"
-				min={5}
-				max={50}
-				value={appDraft.lowBatteryThresholdPercent}
-				disabled={!isTauriShell}
-				onchange={(v) => {
-					appDraft.lowBatteryThresholdPercent = v;
-					appDirty = true;
-				}}
-			/>
+		<div class="pref-list">
+			<div class="pref-row">
+				<Toggle
+					label="Launch at login"
+					checked={appDraft.autostart}
+					disabled={!isTauriShell}
+					onchange={(v) => {
+						appDraft.autostart = v;
+						appDirty = true;
+					}}
+				/>
+			</div>
+			<div class="pref-row">
+				<Toggle
+					label="Watch for firmware publication"
+					hint="Checks the vendor's own config files and firmware directory paths at app start and periodically; never downloads or installs anything."
+					checked={appDraft.firmwareWatchEnabled}
+					disabled={!isTauriShell}
+					onchange={(v) => {
+						appDraft.firmwareWatchEnabled = v;
+						appDirty = true;
+					}}
+				/>
+			</div>
+			<div class="pref-row">
+				<RangeField
+					label="Low battery warning"
+					unit="%"
+					min={5}
+					max={50}
+					value={appDraft.lowBatteryThresholdPercent}
+					disabled={!isTauriShell}
+					onchange={(v) => {
+						appDraft.lowBatteryThresholdPercent = v;
+						appDirty = true;
+					}}
+				/>
+			</div>
 		</div>
 		<button
-			class="btn btn-primary"
+			class="btn btn-primary save-btn"
 			disabled={!isTauriShell || !appDirty || appSaving}
 			onclick={saveAppSettings}
 		>
@@ -410,7 +435,7 @@
 
 		<div class="rule"></div>
 
-		<div class="field gpu-field">
+		<div class="pref-row gpu-row">
 			<SelectField
 				label="Linux NVIDIA renderer workaround"
 				hint="Works around a WebKitGTK blank-window bug on NVIDIA GPUs under Wayland or X11 (Linux only) by disabling its DMABUF renderer. Auto detects the failure condition at each launch. Takes effect on the next launch, not live."
@@ -458,15 +483,53 @@
 		margin: var(--space-md) 0;
 	}
 
-	.pref-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-		gap: var(--space-sm) var(--space-md);
-		margin-bottom: var(--space-md);
+	/* The clean list the operator asked for: one preference per row, label and description on the
+	   left (each Toggle/RangeField's own internal layout already puts the control on the right),
+	   separated by a hairline instead of a wrapping multi-column grid that scattered a row's
+	   label away from its control at odd widths. */
+	.pref-list {
+		display: flex;
+		flex-direction: column;
 	}
 
-	.gpu-field {
+	.pref-row {
+		padding: var(--space-sm) 0;
+	}
+
+	.pref-row + .pref-row {
+		border-top: 1px solid var(--color-rule);
+	}
+
+	.save-btn {
+		margin-top: var(--space-2xs);
+	}
+
+	.gpu-row {
 		max-width: 32rem;
+	}
+
+	.dial-field {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: var(--space-2xs);
+		text-align: center;
+		padding: var(--space-sm) 0 var(--space-2xs);
+	}
+
+	.identifiers-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: var(--space-2xs) var(--space-sm);
+		margin-top: var(--space-sm);
+	}
+
+	.device-actions {
+		justify-content: flex-start;
+		margin-top: var(--space-sm);
+		gap: var(--space-2xs);
 	}
 
 	.backup-row {

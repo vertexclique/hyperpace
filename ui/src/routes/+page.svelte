@@ -8,8 +8,19 @@
 	import LightingScreen from '$lib/screens/LightingScreen.svelte';
 	import FirmwareScreen from '$lib/screens/FirmwareScreen.svelte';
 	import SettingsScreen from '$lib/screens/SettingsScreen.svelte';
+	import DataScreen from '$lib/screens/DataScreen.svelte';
 
-	let active = $state<ScreenId>('performance');
+	// Development mode can name the screen to open on (the app's `dev` module sets
+	// `__HYPERPACE_START_SCREEN__` before the page loads); an ordinary launch opens Performance.
+	const SCREENS: readonly ScreenId[] = ['buttons', 'performance', 'macros', 'lighting', 'firmware', 'data', 'settings'];
+	function initialScreen(): ScreenId {
+		const named =
+			typeof window === 'undefined'
+				? undefined
+				: (window as { __HYPERPACE_START_SCREEN__?: string }).__HYPERPACE_START_SCREEN__;
+		return SCREENS.find((screen) => screen === named) ?? 'performance';
+	}
+	let active = $state<ScreenId>(initialScreen());
 
 	const titles: Record<ScreenId, { title: string; subtitle: string }> = {
 		buttons: { title: 'Buttons', subtitle: 'Assign an action to each button.' },
@@ -20,6 +31,10 @@
 			subtitle: 'Body lighting, the DPI indicator, and the wireless receiver.'
 		},
 		firmware: { title: 'Firmware', subtitle: 'Install, roll back and import firmware packages.' },
+		data: {
+			title: 'Data management',
+			subtitle: 'Device history, saved profiles, macros, the firmware archive and backups.'
+		},
 		settings: { title: 'Settings', subtitle: 'Connection, profiles, backups and app preferences.' }
 	};
 </script>
@@ -38,6 +53,8 @@
 			<LightingScreen />
 		{:else if active === 'firmware'}
 			<FirmwareScreen />
+		{:else if active === 'data'}
+			<DataScreen />
 		{:else if active === 'settings'}
 			<SettingsScreen />
 		{/if}

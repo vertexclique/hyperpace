@@ -63,7 +63,9 @@
 	const CY = 120;
 	const RING_RADIUS = 82;
 	const RING_STROKE = 26;
-	const LABEL_RADIUS = 112;
+	// Close enough to the ring's own outer edge (RING_RADIUS + RING_STROKE / 2 = 95) that a
+	// segment's label reads as belonging to the dial rather than floating in the panel around it.
+	const LABEL_RADIUS = 106;
 	const POINTER_RADIUS = 5.5;
 	// The face bitmap is rendered at this radius, matching the ring's own outer edge, so the
 	// drawn segments sit right over the face's rim rather than floating past or short of it.
@@ -109,8 +111,18 @@
 		onchange?.(values[index].value);
 	}
 
+	/**
+	 * Whether an event started inside the control rendered in the dial's centre (`centerAction`).
+	 * That control is its own button: the dial must not capture its press, or the press turns into
+	 * a segment selection and the button's own click never fires. That is how "turn highest
+	 * performance off" used to silently change its timeout instead.
+	 */
+	function fromCenterAction(event: Event): boolean {
+		return event.target instanceof Element && event.target.closest('.center-action') !== null;
+	}
+
 	function handlePointerDown(event: PointerEvent) {
-		if (effectiveDisabled) return;
+		if (effectiveDisabled || fromCenterAction(event)) return;
 		svgEl?.setPointerCapture(event.pointerId);
 		dragIndex = indexFromPoint(event);
 		event.preventDefault();
@@ -130,7 +142,7 @@
 	}
 
 	function handleKeyDown(event: KeyboardEvent) {
-		if (effectiveDisabled) return;
+		if (effectiveDisabled || fromCenterAction(event)) return;
 		const current = valueIndex === -1 ? 0 : valueIndex;
 		let next = current;
 		switch (event.key) {
@@ -253,7 +265,7 @@
 			class:active={!unknown && i === displayIndex}
 			x={p.x}
 			y={p.y}
-			style="font-size: {fixedFontSize(13)}px"
+			style="font-size: {fixedFontSize(14)}px"
 		>{option.label}</text>
 	{/each}
 
@@ -264,7 +276,7 @@
 			</div>
 		</foreignObject>
 		{#if centerLabel !== undefined}
-			<text class="center-label sub" x={CX} y={CY + 46} style="font-size: {fixedFontSize(13)}px">{unknown ? '-' : centerLabel}</text>
+			<text class="center-label sub" x={CX} y={CY + 46} style="font-size: {fixedFontSize(14)}px">{unknown ? '-' : centerLabel}</text>
 		{/if}
 	{:else if centerLabel !== undefined}
 		<text class="center-label" x={CX} y={CY} style="font-size: {fixedFontSize(26)}px">{unknown ? '-' : centerLabel}</text>
@@ -310,7 +322,7 @@
 	   --dial-size tier is actually rendered, so it is computed as the inverse of the dial's own
 	   measured scale rather than a static value that would shrink with it. */
 	.segment-label {
-		fill: var(--color-muted);
+		fill: var(--color-ink-2);
 		font-weight: 500;
 		text-anchor: middle;
 		dominant-baseline: middle;
@@ -331,7 +343,7 @@
 
 	.center-label.sub {
 		font-weight: 500;
-		fill: var(--color-muted);
+		fill: var(--color-ink-2);
 	}
 
 	.center-action {

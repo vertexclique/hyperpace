@@ -1,7 +1,7 @@
 /* Hallmark · genre: atmospheric · macrostructure: Workbench · design-system: design.md · designed-as-app
  * theme: custom · vibe: "deep space, starlight, instrument-grade, cold vacuum"
  * paper: oklch(14% 0.014 265) · accent: oklch(80% 0.14 200) · shape: cut plate, zero radius
- * display: Space Grotesk · body: Geist · mono: JetBrains Mono
+ * display: Chakra Petch · body: Saira · mono: JetBrains Mono
  * axes: dark / geometric-sans / cool · studied: no
  */
 
@@ -23,8 +23,8 @@
 	--color-danger: oklch(66% 0.17 25);
 	--color-ok: oklch(78% 0.12 155);
 
-	--font-display: 'Space Grotesk Variable', 'Space Grotesk', sans-serif;
-	--font-body: 'Geist Variable', 'Geist', system-ui, sans-serif;
+	--font-display: 'Chakra Petch', sans-serif;
+	--font-body: 'Saira Variable', 'Saira', system-ui, sans-serif;
 	--font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
 
 	--color-faint: oklch(44% 0.012 258);
@@ -283,6 +283,12 @@ select,
 	padding: var(--space-2xs) var(--space-xs);
 	color: var(--color-ink);
 	font-size: var(--text-sm);
+	transition: border-color var(--dur-settle) var(--ease-out);
+}
+
+select:hover:not(:disabled),
+.text-input:hover:not(:disabled) {
+	border-color: var(--color-faint);
 }
 
 select:focus-visible,
@@ -293,8 +299,8 @@ button:focus-visible,
 	outline-offset: 2px;
 }
 
-/* .chip: swatches, tags and the connection badge, cut at --cut-chip. Tone modifiers stand in
-   for the old .tag-success / .tag-warning / .tag-danger / .tag-neutral set. */
+/* .chip: swatches and tags, cut at --cut-chip. Tone modifiers stand in for the old
+   .tag-success / .tag-warning / .tag-danger / .tag-neutral set. */
 .chip {
 	display: inline-flex;
 	align-items: center;
@@ -336,6 +342,31 @@ button:focus-visible,
 .grid {
 	display: grid;
 	gap: var(--space-md);
+}
+
+/* .instrument / .segment: the top bar's one composed device-status readout (ConnectionBadge and
+   BatteryIndicator together). A single cut-chip plate housing every fact the app knows about the
+   mouse's link and power, each fact a segment separated by a hairline, never three loose chips
+   standing for one instrument. A segment that has nothing to show renders no element at all, so
+   the hairline before it never appears either. */
+.instrument {
+	display: inline-flex;
+	align-items: stretch;
+	background: var(--color-paper-3);
+	border: 1px solid var(--color-rule);
+	clip-path: polygon(0 0, calc(100% - var(--cut-chip)) 0, 100% var(--cut-chip), 100% 100%, 0 100%);
+}
+
+.segment {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2xs);
+	padding: var(--space-2xs) var(--space-sm);
+	white-space: nowrap;
+}
+
+.segment + .segment {
+	border-left: 1px solid var(--color-rule);
 }
 
 /* --- Transitional aliases -------------------------------------------------

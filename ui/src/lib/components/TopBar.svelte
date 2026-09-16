@@ -16,9 +16,10 @@
 		{#if subtitle}<p class="subtitle">{subtitle}</p>{/if}
 	</div>
 
-	<!-- The window's one device readout. The tray carries the same facts for when the window is
+	<!-- The window's one device readout: a single composed instrument, not three loose chips
+	     (app.css .instrument/.segment). The tray carries the same facts for when the window is
 	     closed; both read them from the same connection state, never from a default. -->
-	<div class="device" aria-live="polite">
+	<div class="instrument" aria-live="polite">
 		<ConnectionBadge />
 		<BatteryIndicator />
 	</div>
@@ -34,7 +35,7 @@
 	}
 
 	/* font-family/weight/tracking come from app.css's global h1 rule (design.md Typography:
-	   Space Grotesk 600 for screen titles); only the size is set here. */
+	   Chakra Petch 600 for screen titles); only the size is set here. */
 	h1 {
 		font-size: var(--text-display);
 	}
@@ -45,13 +46,10 @@
 		color: var(--color-muted);
 	}
 
-	.device {
-		display: flex;
-		align-items: center;
-		gap: var(--space-sm);
+	.instrument {
 		flex-shrink: 0;
 		/* Sits on the display line's optical centre rather than its box top. */
-		padding-top: var(--space-3xs);
+		margin-top: var(--space-3xs);
 	}
 
 	@media (max-width: 900px) {
@@ -60,8 +58,8 @@
 			gap: var(--space-2xs);
 		}
 
-		.device {
-			padding-top: 0;
+		.instrument {
+			margin-top: 0;
 		}
 	}
 </style>

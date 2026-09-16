@@ -45,7 +45,8 @@
 	const DPI_MIN = 50;
 	const DPI_MAX = 40000;
 	const DPI_STEP = 50;
-	const DPI_TICKS = [800, 8000, 16000, 24000, 32000, 40000];
+	// Starts at the real floor (DPI_MIN), not at whatever a stage's current value happens to be.
+	const DPI_TICKS = [DPI_MIN, 8000, 16000, 24000, 32000, DPI_MAX];
 
 	// The dial only offers the named variants (never `other`), so reading its bound value needs a
 	// narrowed read: this also keeps SegmentDial's generic inferred as the named-only union
@@ -122,21 +123,19 @@
 {#if !device.connected}
 	<p class="page-pad caption-note">No mouse connected. Plug in the receiver or the cable.</p>
 {/if}
-<div class="page-pad perf-stack">
+<div class="perf-stack">
 	<div class="perf-row">
 		<section class="plate plate-dpi">
 			<div class="plate-head">
-				<h2>DPI stages</h2>
+				<h2><span class="plate-stub"></span>DPI stages</h2>
+				<span class="field-hint">Up to {MAX_DPI_STAGES} &middot; active stage drives the DPI switch</span>
 			</div>
-			<p class="plate-desc">
-				Up to {MAX_DPI_STAGES} stages. The active stage is bound to the DPI switch action.
-			</p>
 			<div class="stage-list">
 				{#each draft.dpiStages as stage, i (i)}
 					<div class="stage-row" class:current={draft.currentStage === i}>
 						<button
 							type="button"
-							class="stage-radio"
+							class="stage-index"
 							aria-pressed={draft.currentStage === i}
 							title="Set as active stage"
 							disabled={!hasData}
@@ -151,9 +150,9 @@
 							<span class="stage-value-num mono">{hasData ? stage.dpi : '-'}</span>
 							<span class="stage-value-unit">DPI</span>
 						</div>
-						<div class="stage-dpi">
+						<div class="stage-slider">
 							<RangeSlider
-								label="DPI"
+								label={`DPI stage ${i + 1}`}
 								min={DPI_MIN}
 								max={DPI_MAX}
 								step={DPI_STEP}
@@ -173,11 +172,15 @@
 						</div>
 						<button
 							type="button"
-							class="btn btn-danger stage-remove"
+							class="stage-remove"
 							disabled={!hasData || draft.dpiStages.length <= 1}
+							aria-label={`Remove DPI stage ${i + 1}`}
+							title="Remove stage"
 							onclick={() => removeStage(i)}
 						>
-							Remove
+							<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+								<path d="M4 4l8 8M12 4l-8 8" />
+							</svg>
 						</button>
 					</div>
 				{/each}
@@ -190,31 +193,31 @@
 		<section class="plate plate-tracking">
 			<div class="plate-head">
 				<h2>Tracking</h2>
+				<span class="field-hint">Polling, lift-off, sensor mode</span>
 			</div>
-			<p class="plate-desc">Polling rate, lift-off distance and sensor mode.</p>
 			<div class="dial-row">
-				<div class="dial-field dial-field-compact">
+				<div class="dial-field">
 					<span class="field-label">Sensor mode</span>
 					<SegmentDial
 						values={SENSOR_MODE_OPTIONS}
 						value={draft.sensorMode}
 						ariaLabel="Sensor mode"
 						unknown={!hasData}
-						size="default"
+						size="compact"
 						onchange={(v) => {
 							draft.sensorMode = v;
 							touch();
 						}}
 					/>
 				</div>
-				<div class="dial-field dial-field-compact">
+				<div class="dial-field">
 					<span class="field-label">Lift-off distance</span>
 					<SegmentDial
 						values={LOD_OPTIONS}
 						value={lodName(draft.lod.value)}
 						ariaLabel="Lift-off distance"
 						unknown={!hasData}
-						size="default"
+						size="compact"
 						onchange={(v) => {
 							draft.lod = { value: v };
 							touch();
@@ -251,11 +254,10 @@
 	</div>
 
 	<div class="perf-row">
-		<section class="plate plate-narrow">
+		<section class="plate plate-motion">
 			<div class="plate-head">
 				<h2>Motion</h2>
 			</div>
-			<p class="plate-desc">Cursor path corrections applied by the sensor firmware.</p>
 			<div class="field-stack">
 				<Toggle
 					label="Motion sync"
@@ -287,11 +289,29 @@
 			</div>
 		</section>
 
-		<section class="plate plate-wide">
+		<section class="plate plate-longrange">
+			<div class="plate-head">
+				<h2>Long range</h2>
+			</div>
+			{#if hasData && draft.longRange === 'unsupported'}
+				<p class="field-hint">Not supported on this device.</p>
+			{:else}
+				<Toggle
+					label="Long range mode"
+					checked={draft.longRange === 'on'}
+					disabled={!hasData}
+					onchange={(v) => {
+						draft.longRange = v ? 'on' : 'off';
+						touch();
+					}}
+				/>
+			{/if}
+		</section>
+
+		<section class="plate plate-power">
 			<div class="plate-head">
 				<h2><span class="plate-stub"></span>Power</h2>
 			</div>
-			<p class="plate-desc">Sleep timer and highest-performance mode.</p>
 			{#snippet performanceToggle()}
 				<button
 					type="button"
@@ -306,7 +326,7 @@
 						touch();
 					}}
 				>
-					<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+					<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
 						<path d="M12 3v8" />
 						<path d="M6.5 6.5a8 8 0 1 0 11 0" />
 					</svg>
@@ -320,7 +340,7 @@
 						value={sleepTimeName(draft.sleep.value)}
 						ariaLabel="Sleep after"
 						unknown={!hasData}
-						size="large"
+						size="default"
 						centerLabel={timeoutLabel(draft.sleep.value)}
 						onchange={(v) => {
 							draft.sleep = { value: v };
@@ -335,7 +355,7 @@
 						value={sleepTimeName(draft.performance.timeout.value)}
 						ariaLabel="Highest performance timeout"
 						unknown={!hasData}
-						size="large"
+						size="default"
 						centerLabel={timeoutLabel(draft.performance.timeout.value)}
 						centerAction={performanceToggle}
 						onchange={(v) => {
@@ -347,26 +367,6 @@
 			</div>
 		</section>
 	</div>
-
-	<section class="plate">
-		<div class="plate-head">
-			<h2>Long range</h2>
-		</div>
-		<p class="plate-desc">Extends the wireless link's effective range on receivers that support it.</p>
-		{#if hasData && draft.longRange === 'unsupported'}
-			<p class="field-hint">Not supported on this device.</p>
-		{:else}
-			<Toggle
-				label="Long range mode"
-				checked={draft.longRange === 'on'}
-				disabled={!hasData}
-				onchange={(v) => {
-					draft.longRange = v ? 'on' : 'off';
-					touch();
-				}}
-			/>
-		{/if}
-	</section>
 </div>
 
 <div class="apply-bar">
@@ -383,19 +383,22 @@
 		padding: 0 var(--space-xl) var(--space-xl);
 	}
 
-	/* Explicit rows, not an auto-flowing grid: Tracking and Power need real, predictable width to
-	   hold two dials side by side, so each pairs with a single narrow panel in its own flex row
-	   (`plate-narrow`/`plate-wide`, `plate-dpi`/`plate-tracking`). Rows align to the top, not
-	   stretched to match height: DPI stages and Motion carry however much the device actually
-	   reports, and forcing them to match a taller sibling's height used to leave a bordered plate
-	   mostly empty below its real content, which is the bug, not a look to preserve. Keeps the
-	   whole screen inside the default window without scrolling (docs/architecture/ui-controls.md
-	   section 5). */
+	/* Explicit rows, not an auto-flowing grid: each row needs real, predictable width to hold its
+	   panels side by side, so DPI/Tracking share one row and Motion/Long range/Power share the
+	   next. Rows align to the top, not stretched to match height, so a shorter panel never carries
+	   a slab of empty space just to match a taller sibling. Padding is tightened from the shared
+	   .plate default (space-md all round) to space-sm vertically so this screen's six panels clear
+	   the default window without scrolling (docs/architecture/ui-controls.md section 5); the
+	   horizontal space-md stays, so panel content keeps its breathing room side to side. */
 	.perf-stack {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-sm);
-		padding: 0 var(--space-xl) var(--space-lg);
+		padding: 0 var(--space-xl) var(--space-md);
+	}
+
+	.perf-stack .plate {
+		padding: var(--space-sm) var(--space-md);
 	}
 
 	.perf-row {
@@ -404,19 +407,6 @@
 		align-items: flex-start;
 	}
 
-	.perf-row > .plate-narrow {
-		flex: 1 1 0;
-		min-width: 0;
-	}
-
-	.perf-row > .plate-wide {
-		flex: 2 1 0;
-		min-width: 0;
-	}
-
-	/* DPI stages needs more width than the 1:2 split gives it once each row carries a readable
-	   mono value next to its slider and swatch; Tracking gives up a little in return; at this
-	   width its own default-size dials still clear their container with room to spare. */
 	.perf-row > .plate-dpi {
 		flex: 1 1 0;
 		min-width: 0;
@@ -427,14 +417,26 @@
 		min-width: 0;
 	}
 
+	.perf-row > .plate-motion,
+	.perf-row > .plate-longrange {
+		flex: 1 1 0;
+		min-width: 0;
+	}
+
+	.perf-row > .plate-power {
+		flex: 1.6 1 0;
+		min-width: 0;
+	}
+
 	@media (max-width: 900px) {
 		.perf-row {
 			flex-direction: column;
 		}
 	}
 
-	/* Title row above its own hairline (.plate-head, app.css); the stub marks Power as this
-	   screen's lead panel, the one holding the hero dial. */
+	/* Title row above its own hairline (.plate-head, app.css); the stub marks DPI stages and
+	   Power as this screen's two lead panels. The inline hint on the right keeps a panel's one
+	   line of context without a whole extra paragraph row eating vertical space. */
 	.plate-head h2 {
 		display: flex;
 		align-items: center;
@@ -446,10 +448,8 @@
 		color: var(--color-ink);
 	}
 
-	.plate-desc {
-		margin: 0 0 var(--space-sm);
-		font-size: var(--text-xs);
-		color: var(--color-muted);
+	.plate-head .field-hint {
+		white-space: nowrap;
 	}
 
 	.field-stack {
@@ -466,23 +466,27 @@
 
 	.linear-row > :global(*) {
 		flex: 1;
-		min-width: 160px;
+		min-width: 150px;
 	}
 
 	.stage-list {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-2xs);
-		margin-bottom: var(--space-sm);
+		gap: var(--space-3xs);
+		margin-bottom: var(--space-xs);
 	}
 
+	/* One line per stage, about 40px tall: an index, the reading, an inline slider spanning the
+	   row, the stored colour and a small remove control. Up to MAX_DPI_STAGES (8) of these stack
+	   without pushing anything below the fold. */
 	.stage-row {
 		display: flex;
 		align-items: center;
 		gap: var(--space-2xs);
+		min-height: 40px;
+		padding: var(--space-3xs) var(--space-2xs);
 		background: var(--color-paper-2);
 		border: 1px solid var(--color-rule);
-		padding: var(--space-2xs) var(--space-xs);
 	}
 
 	.stage-row.current {
@@ -491,32 +495,32 @@
 
 	/* A numbered index badge, not a device reading: cut at --cut-chip like every other swatch and
 	   badge in the app (design.md "Shape"), never the circle it used to be. */
-	.stage-radio {
-		width: 26px;
-		height: 26px;
+	.stage-index {
+		width: 24px;
+		height: 24px;
 		background: var(--color-paper-3);
 		border: 1px solid var(--color-rule);
+		color: var(--color-ink-2);
 		font-size: var(--text-xs);
 		font-weight: 700;
 		flex-shrink: 0;
 		clip-path: polygon(0 0, calc(100% - var(--cut-chip)) 0, 100% var(--cut-chip), 100% 100%, 0 100%);
 	}
 
-	.stage-row.current .stage-radio {
+	.stage-row.current .stage-index {
 		background: var(--color-accent);
 		color: var(--color-accent-ink);
 		border-color: var(--color-accent);
 	}
 
-	/* The stage's actual DPI reading: a real instrument readout, not just whatever the slider's
-	   own (much smaller) value label shows. Always mono with tabular figures (design.md
-	   Typography): the one number in this row a device actually reports. */
+	/* The stage's actual DPI reading: a real instrument readout, large and in mono, the one number
+	   in this row a device actually reports (design.md Typography). */
 	.stage-value {
 		display: flex;
 		align-items: baseline;
 		gap: var(--space-3xs);
 		flex-shrink: 0;
-		min-width: 3.6em;
+		min-width: 4.2em;
 	}
 
 	.stage-value-num {
@@ -533,9 +537,31 @@
 		letter-spacing: 0.04em;
 	}
 
-	.stage-dpi {
+	/* The row's own DPI reading and swatch already carry the value and colour; RangeSlider's own
+	   value bubble and tick-row text would just repeat them at this row height, so both are
+	   dropped, leaving the bare track (with its tick marks) spanning the row. Its accessible name
+	   still comes from the `aria-label` on the slider element itself, not this hidden label.
+	   `.value-row` is collapsed to zero height rather than `display: none`: its label and its
+	   edit-on-Enter input are both absolutely positioned inside it (so the zero height never clips
+	   either one), and a `display: none` ancestor would make the edit input unfocusable, silently
+	   breaking the "press Enter to type an exact value" path this row must keep. */
+	.stage-slider {
 		flex: 1;
 		min-width: 90px;
+	}
+
+	.stage-slider :global(.field-label),
+	.stage-slider :global(.value-label),
+	.stage-slider :global(.tick-row) {
+		display: none;
+	}
+
+	.stage-slider :global(.value-row) {
+		height: 0;
+	}
+
+	.stage-slider :global(.field) {
+		gap: 0;
 	}
 
 	/* ColorSwatchPicker renders its own preview chip alongside a native colour input and a hex
@@ -564,9 +590,34 @@
 		display: none;
 	}
 
+	.stage-color :global(.swatch) {
+		width: 22px !important;
+		height: 22px !important;
+	}
+
+	/* A plain icon button, danger only on hover/focus, never a persistent red-outlined box
+	   (the operator's "DPI Stages looks shit" was in part five of these per screen). */
 	.stage-remove {
 		flex-shrink: 0;
-		margin-left: auto;
+		width: 26px;
+		height: 26px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: transparent;
+		border: 1px solid transparent;
+		color: var(--color-muted);
+		clip-path: polygon(0 0, calc(100% - var(--cut-chip)) 0, 100% var(--cut-chip), 100% 100%, 0 100%);
+	}
+
+	.stage-remove:hover:not(:disabled) {
+		border-color: var(--color-danger);
+		color: var(--color-danger);
+		background: var(--color-danger-soft);
+	}
+
+	.stage-remove:disabled {
+		opacity: 0.35;
 	}
 
 	.dial-row {
@@ -574,12 +625,8 @@
 		flex-wrap: wrap;
 		justify-content: center;
 		gap: var(--space-lg);
-		margin-bottom: var(--space-3xs);
+		margin-bottom: var(--space-sm);
 		container-type: inline-size;
-	}
-
-	.dial-row-hero {
-		gap: var(--space-lg);
 	}
 
 	.dial-field {
@@ -590,33 +637,12 @@
 		text-align: center;
 	}
 
-	/* Sensor mode and Lift-off distance: SegmentDial's own segment-label text lives inside its
-	   240-unit viewBox and shrinks along with the dial's physical box, which at this dial's size
-	   left it under design.md's --text-xs floor with muted-on-paper contrast (the operator's "far
-	   too small to read"). Forced up directly since SegmentDial.svelte is not this row's file to
-	   change; the font-size compensates for this dial's own viewBox-to-box scale so the rendered
-	   text actually clears --text-xs, and the active segment keeps its own accent fill (only the
-	   non-active labels get the contrast bump, so the active-stage accent language still reads).
-	   !important guards against a tie with that component's own same-specificity scoped rules. */
-	.dial-field-compact :global(.segment-label) {
-		font-size: 18px !important;
-	}
-
-	.dial-field-compact :global(.segment-label:not(.active)) {
-		fill: var(--color-ink-2) !important;
-	}
-
-	/* Dials shrink a tier before their panel ever needs to scroll (docs/architecture/ui-controls.md
-	   section 5): the default tier drops to compact once a row of two no longer fits the panel's
-	   own width, and the hero (large) row drops to default, then compact, on the same basis. */
-	@container (max-width: 520px) {
+	/* Dials drop a tier before their panel ever needs to scroll
+	   (docs/architecture/ui-controls.md section 5): the Power panel's pair starts at the default
+	   tier already (chosen explicitly below, not "large") and steps down to compact only if its
+	   own container gets unusually narrow. */
+	@container (max-width: 380px) {
 		.dial-row-hero {
-			--dial-size: var(--dial-default);
-		}
-	}
-
-	@container (max-width: 360px) {
-		.dial-row {
 			--dial-size: var(--dial-compact);
 		}
 	}
@@ -646,6 +672,8 @@
 		opacity: 0.45;
 	}
 
+	/* A solid ground, not a fade to transparent: the bar sits below the panels rather than
+	   bleeding into whatever the last row happened to draw beneath it. */
 	.apply-bar {
 		position: sticky;
 		bottom: 0;
@@ -654,7 +682,7 @@
 		gap: var(--space-xs);
 		padding: var(--space-sm) var(--space-xl);
 		border-top: 1px solid var(--color-rule);
-		background: linear-gradient(to top, var(--color-paper) 60%, transparent);
+		background: var(--color-paper);
 	}
 
 	.error-text {

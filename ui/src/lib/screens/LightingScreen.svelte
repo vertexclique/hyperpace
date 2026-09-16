@@ -7,6 +7,8 @@
 		LightMode,
 		LightModeName,
 		ReceiverLight,
+		ReceiverLightState,
+		RgbColor,
 		Settings
 	} from '../types';
 	import SelectField from '../components/SelectField.svelte';
@@ -42,6 +44,24 @@
 		return mode === 'other' ? 'off' : mode;
 	}
 
+	function modeLabel(mode: LightModeName): string {
+		return LIGHTING_MODES.find((m) => m.value === mode)?.label ?? 'This effect';
+	}
+
+	/** The one-line reason a color or speed field is disabled for the active effect (design.md
+	 * "no invented default": the field still shows the real reading, only editing is blocked). */
+	function controlReason(kind: 'color' | 'speed', mode: LightModeName): string {
+		return `${modeLabel(mode)} has no ${kind} control.`;
+	}
+
+	function toHex(c: RgbColor): string {
+		return `#${c.map((n) => n.toString(16).padStart(2, '0')).join('')}`;
+	}
+
+	// Neither field's device-reported unit is documented by the vendor; shared so the two spots
+	// that say so (receiver timeout, DPI indicator speed) can't drift apart in wording.
+	const RAW_UNIT_HINT = 'Unit not confirmed by the vendor.';
+
 	// `draft` is always a structurally complete Settings object, never null: when no device is
 	// connected (or its settings have not been read yet) it holds BLANK_SETTINGS instead, so
 	// every control below stays mounted. `hasData` gates each control's `disabled`/`unknown`
@@ -60,10 +80,56 @@
 	});
 
 	let controls = $derived(lightingControls(draft.lighting.mode.mode));
+	let activeModeName = $derived(lightModeName(draft.lighting.mode.mode));
+	let activeEffectIndex = $derived(LIGHTING_MODES.findIndex((m) => m.value === activeModeName));
+	let effectTabIndex = $derived(activeEffectIndex === -1 ? 0 : activeEffectIndex);
 
 	function touch() {
 		dirty = true;
 	}
+
+	function selectEffect(mode: LightModeName) {
+		if (!hasData) return;
+		draft.lighting = { ...draft.lighting, mode: { mode } };
+		touch();
+	}
+
+	let effectTileRefs: (HTMLButtonElement | undefined)[] = $state([]);
+
+	/** Roving-tabindex arrow-key navigation across the effect tile grid, the same keyboard
+	 * contract a native radiogroup gives (Home/End to the ends, arrows to the neighbour). */
+	function handleEffectKeydown(event: KeyboardEvent, index: number) {
+		let next = index;
+		switch (event.key) {
+			case 'ArrowRight':
+			case 'ArrowDown':
+				next = (index + 1) % LIGHTING_MODES.length;
+				break;
+			case 'ArrowLeft':
+			case 'ArrowUp':
+				next = (index - 1 + LIGHTING_MODES.length) % LIGHTING_MODES.length;
+				break;
+			case 'Home':
+				next = 0;
+				break;
+			case 'End':
+				next = LIGHTING_MODES.length - 1;
+				break;
+			default:
+				return;
+		}
+		event.preventDefault();
+		selectEffect(LIGHTING_MODES[next].value);
+		effectTileRefs[next]?.focus();
+	}
+
+	// The live preview strip near the mouse lighting controls: an honest read of the effect,
+	// color, speed and brightness this screen is about to apply, not a decorative loop. Speed
+	// 0..9 maps to a faster-cycling animation, brightness 0..9 to the strip's own opacity, and it
+	// goes flat and still the moment lighting is off, matching the mouse rather than pretending.
+	let previewDuration = $derived(Math.max(0.4, 3.6 - draft.lighting.speed * 0.32).toFixed(2));
+	let previewOpacity = $derived((0.3 + (draft.lighting.brightness / 9) * 0.7).toFixed(2));
+	let previewColorHex = $derived(toHex(draft.lighting.color));
 
 	/** Sends one `write_setting` call per field that actually changed since the last read (see
 	 * `diffSettings`); in practice just the lighting field, since this screen only edits that. */
@@ -81,33 +147,45 @@
 	// Receiver light (SetReceiverLight/GetReceiverLight, command 24/25).
 	// Distinct from the mouse body lighting struct above and not part of
 	// Settings, so it is edited and sent independently.
-	let receiverLight = $state<ReceiverLight>({
+	const BLANK_RECEIVER_LIGHT: ReceiverLight = {
 		mode: 0,
 		color: [255, 255, 255],
 		speed: 5,
 		brightness: 5,
 		time: 0
-	});
+	};
+
+	let receiverDraft = $state<ReceiverLight>(structuredClone(BLANK_RECEIVER_LIGHT));
+	let receiverDirty = $state(false);
 	let receiverSaving = $state(false);
 
-	// Honesty fix: unlike every other control on this screen, the receiver light has no read path
-	// at all. The protocol has a GetReceiverLight command (mouse-protocol-v2.md 7.x, command 25),
-	// and the device layer can round-trip it (hyperpace-device::owner), but no Tauri command
-	// exposes that read to the frontend: crates/hyperpace-app/src/command_list.rs registers only
-	// the write-only `receiver_light`. So `receiverLight` above is never a device reading, only a
-	// draft the operator composes to send. Gating its controls on `hasData` (whether the *mouse's*
-	// Settings loaded) showed these plain JS defaults ("Speed 5", "Brightness 5", "#ffffff",
-	// "Timeout 0") the moment any device connected, as though the receiver had reported them.
-	// Until a real read command exists, every control bound to it stays `unknown`, the same
-	// disabled-and-blank contract every reading-backed control here already honors (see
-	// BLANK_SETTINGS's doc comment and SegmentDial's `unknown` prop doc). Always `true`, not a
-	// derived value, because nothing in this app can ever make it otherwise today.
-	const RECEIVER_LIGHT_UNKNOWN = true;
+	let receiverReportedLight = $derived.by((): ReceiverLight | null => {
+		const state: ReceiverLightState | null = device.receiverLight;
+		return state && state.state === 'reported' ? state.light : null;
+	});
+	let receiverUnsupported = $derived(device.receiverLight?.state === 'unsupported');
+	let receiverHasData = $derived(receiverReportedLight !== null);
+	/** No real reading exists yet, whether because the read has not completed or because the
+	 * receiver reported it has no light to read; both show blank, never a guessed value. */
+	let receiverUnknown = $derived(!receiverHasData);
+
+	$effect(() => {
+		// Same rule as the settings draft above: snapshot the reactive reading, never structuredClone it.
+		receiverDraft = receiverReportedLight
+			? $state.snapshot(receiverReportedLight)
+			: structuredClone(BLANK_RECEIVER_LIGHT);
+		receiverDirty = false;
+	});
+
+	function touchReceiver() {
+		receiverDirty = true;
+	}
 
 	async function applyReceiverLight() {
 		receiverSaving = true;
 		try {
-			await device.setReceiverLight(receiverLight);
+			await device.setReceiverLight(receiverDraft);
+			receiverDirty = false;
 		} finally {
 			receiverSaving = false;
 		}
@@ -173,8 +251,7 @@
 			<h2><span class="plate-stub"></span>Receiver</h2>
 		</div>
 		<p class="plate-desc">
-			The 2.4 GHz dongle: its light, pairing and a factory reset. The receiver never reports its
-			light settings back, so the controls below stay disabled until that changes.
+			The 2.4 GHz dongle: pairing, factory reset and its own indicator light.
 			{#if !device.connected}<span class="caption-note">No mouse connected.</span>{/if}
 		</p>
 		<div class="receiver-layout">
@@ -213,19 +290,30 @@
 			</div>
 
 			<div class="field-stack receiver-fields">
+				{#if device.connected && receiverUnsupported}
+					<p class="field-hint caption-note">
+						This receiver reports it has no light to read or set.
+					</p>
+				{/if}
 				<div class="field-pair receiver-mode-row">
 					<SelectField
 						label="Receiver light effect"
-						value={receiverLight.mode}
+						value={receiverDraft.mode}
 						options={RECEIVER_LIGHT_MODES}
-						unknown={RECEIVER_LIGHT_UNKNOWN}
-						onchange={(v) => (receiverLight = { ...receiverLight, mode: v })}
+						unknown={receiverUnknown}
+						onchange={(v) => {
+							receiverDraft = { ...receiverDraft, mode: v };
+							touchReceiver();
+						}}
 					/>
 					<ColorSwatchPicker
 						label="Color"
-						color={receiverLight.color}
-						unknown={RECEIVER_LIGHT_UNKNOWN}
-						onchange={(c) => (receiverLight = { ...receiverLight, color: c })}
+						color={receiverDraft.color}
+						unknown={receiverUnknown}
+						onchange={(c) => {
+							receiverDraft = { ...receiverDraft, color: c };
+							touchReceiver();
+						}}
 					/>
 				</div>
 				<div class="dial-row">
@@ -234,38 +322,47 @@
 						ariaLabel="Receiver light speed"
 						min={0}
 						max={9}
-						value={receiverLight.speed}
-						unknown={RECEIVER_LIGHT_UNKNOWN}
-						size="large"
-						onchange={(v) => (receiverLight = { ...receiverLight, speed: v })}
+						value={receiverDraft.speed}
+						unknown={receiverUnknown}
+						size="default"
+						onchange={(v) => {
+							receiverDraft = { ...receiverDraft, speed: v };
+							touchReceiver();
+						}}
 					/>
 					<ArcDial
 						label="Brightness"
 						ariaLabel="Receiver light brightness"
 						min={0}
 						max={9}
-						value={receiverLight.brightness}
-						unknown={RECEIVER_LIGHT_UNKNOWN}
-						size="large"
-						onchange={(v) => (receiverLight = { ...receiverLight, brightness: v })}
+						value={receiverDraft.brightness}
+						unknown={receiverUnknown}
+						size="default"
+						onchange={(v) => {
+							receiverDraft = { ...receiverDraft, brightness: v };
+							touchReceiver();
+						}}
 					/>
 				</div>
 				<RangeSlider
 					label="Timeout (raw)"
-					hint="Unit is not specified in the protocol reference"
+					hint={RAW_UNIT_HINT}
 					min={0}
 					max={255}
 					ticks={[0, 64, 128, 192, 255]}
-					value={receiverLight.time}
-					unknown={RECEIVER_LIGHT_UNKNOWN}
-					onchange={(v) => (receiverLight = { ...receiverLight, time: v })}
+					value={receiverDraft.time}
+					unknown={receiverUnknown}
+					onchange={(v) => {
+						receiverDraft = { ...receiverDraft, time: v };
+						touchReceiver();
+					}}
 				/>
 				<button
-					class="btn btn-primary apply-receiver-btn"
-					disabled={!hasData || receiverSaving}
+					class="btn btn-primary apply-btn"
+					disabled={!receiverHasData || !receiverDirty || receiverSaving}
 					onclick={applyReceiverLight}
 				>
-					{receiverSaving ? 'Applying...' : 'Apply receiver light'}
+					{applyButtonLabel(receiverHasData, receiverDirty, receiverSaving)}
 				</button>
 			</div>
 		</div>
@@ -277,10 +374,10 @@
 	<div class="light-row">
 		<section class="plate light-col">
 			<div class="plate-head">
-				<h2>Mouse lighting</h2>
+				<h2><span class="plate-stub"></span>Mouse lighting</h2>
 			</div>
 			<p class="plate-desc">
-				The body light strip and its effect.
+				The body light strip: its effect, color, speed and brightness.
 				{#if !device.connected}<span class="caption-note">No mouse connected.</span>{/if}
 			</p>
 			<div class="field-stack">
@@ -293,44 +390,84 @@
 						touch();
 					}}
 				/>
-				<SelectField
-					label="Effect"
-					value={lightModeName(draft.lighting.mode.mode)}
-					options={LIGHTING_MODES}
-					unknown={!hasData}
-					onchange={(v) => {
-						draft.lighting = { ...draft.lighting, mode: { mode: v } };
-						touch();
-					}}
-				/>
-				{#if controls.color || controls.speed}
-					<div class="field-pair">
-						{#if controls.color}
-							<ColorSwatchPicker
-								label="Color"
-								color={draft.lighting.color}
-								unknown={!hasData}
-								onchange={(c) => {
-									draft.lighting = { ...draft.lighting, color: c };
-									touch();
-								}}
-							/>
+
+				<div class="preview-row">
+					<div
+						class="preview-surface live-preview"
+						data-effect={hasData && draft.lighting.on ? activeModeName : undefined}
+						style="--tile-color:{previewColorHex}; --preview-duration:{previewDuration}s; --preview-opacity:{previewOpacity};"
+						aria-hidden="true"
+					></div>
+					<span class="field-hint">
+						{#if !hasData}No reading yet.
+						{:else if !draft.lighting.on}Lighting is off.
+						{:else}Live preview at the current speed and brightness.
 						{/if}
-						{#if controls.speed}
-							<RangeField
-								label="Speed"
-								min={0}
-								max={9}
-								value={draft.lighting.speed}
-								unknown={!hasData}
-								onchange={(v) => {
-									draft.lighting = { ...draft.lighting, speed: v };
-									touch();
-								}}
-							/>
+					</span>
+				</div>
+
+				<div class="field">
+					<span class="field-label">Effect</span>
+					<div class="effect-grid" role="radiogroup" aria-label="Mouse lighting effect">
+						{#each LIGHTING_MODES as option, i (option.value)}
+							<button
+								type="button"
+								role="radio"
+								aria-checked={activeModeName === option.value}
+								class="effect-tile"
+								class:active={activeModeName === option.value}
+								disabled={!hasData}
+								tabindex={!hasData ? -1 : i === effectTabIndex ? 0 : -1}
+								bind:this={effectTileRefs[i]}
+								onclick={() => selectEffect(option.value)}
+								onkeydown={(e) => handleEffectKeydown(e, i)}
+							>
+								<span
+									class="preview-surface effect-preview"
+									data-effect={option.value}
+									style="--tile-color:{previewColorHex}"
+									aria-hidden="true"
+								></span>
+								<span class="effect-name">{option.label}</span>
+							</button>
+						{/each}
+					</div>
+				</div>
+
+				<div class="field-pair">
+					<div class="field-with-reason">
+						<ColorSwatchPicker
+							label="Color"
+							color={draft.lighting.color}
+							unknown={!hasData}
+							disabled={!controls.color}
+							onchange={(c) => {
+								draft.lighting = { ...draft.lighting, color: c };
+								touch();
+							}}
+						/>
+						{#if hasData && !controls.color}
+							<span class="caption-note">{controlReason('color', activeModeName)}</span>
 						{/if}
 					</div>
-				{/if}
+					<div class="field-with-reason">
+						<RangeField
+							label="Speed"
+							min={0}
+							max={9}
+							value={draft.lighting.speed}
+							unknown={!hasData}
+							disabled={!controls.speed}
+							onchange={(v) => {
+								draft.lighting = { ...draft.lighting, speed: v };
+								touch();
+							}}
+						/>
+						{#if hasData && !controls.speed}
+							<span class="caption-note">{controlReason('speed', activeModeName)}</span>
+						{/if}
+					</div>
+				</div>
 				<RangeField
 					label="Brightness"
 					min={0}
@@ -343,7 +480,7 @@
 					}}
 				/>
 
-				<button class="btn btn-primary" disabled={!hasData || !dirty || saving} onclick={apply}>
+				<button class="btn btn-primary apply-btn" disabled={!hasData || !dirty || saving} onclick={apply}>
 					{applyButtonLabel(hasData, dirty, saving)}
 				</button>
 				{#if device.lastError}
@@ -354,7 +491,7 @@
 
 		<section class="plate light-col">
 			<div class="plate-head">
-				<h2>DPI indicator</h2>
+				<h2><span class="plate-stub"></span>DPI indicator</h2>
 			</div>
 			<p class="plate-desc">
 				The per-stage indicator light: mode, brightness, speed and on/off.
@@ -394,7 +531,7 @@
 					/>
 					<RangeField
 						label="Speed (raw)"
-						hint="Unit is not specified in the protocol reference"
+						hint={RAW_UNIT_HINT}
 						min={0}
 						max={255}
 						value={draft.dpiIndicator.speed}
@@ -406,7 +543,7 @@
 					/>
 				</div>
 
-				<button class="btn btn-primary" disabled={!hasData || !dirty || saving} onclick={apply}>
+				<button class="btn btn-primary apply-btn" disabled={!hasData || !dirty || saving} onclick={apply}>
 					{applyButtonLabel(hasData, dirty, saving)}
 				</button>
 				{#if device.lastError}
@@ -445,8 +582,8 @@
 		}
 	}
 
-	/* Title row above its own hairline (.plate-head, app.css); the stub marks Receiver as this
-	   screen's lead panel. */
+	/* Title row above its own hairline (.plate-head, app.css); the stub marks each panel as a
+	   live, functioning surface rather than a static label. */
 	.plate-head h2 {
 		display: flex;
 		align-items: center;
@@ -482,6 +619,16 @@
 	.field-pair :global(.field) {
 		flex: 1;
 		min-width: 140px;
+	}
+
+	/* Wraps a field plus its one-line "not used by this effect" note (design.md's control-language
+	   contract: a disabled control stays visible with a stated reason, never hidden outright). */
+	.field-with-reason {
+		flex: 1;
+		min-width: 140px;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3xs);
 	}
 
 	/* The receiver's effect+color row: a select field genuinely wants the row's width (its option
@@ -534,10 +681,10 @@
 		min-width: 260px;
 	}
 
-	/* .field-stack's column stretches every child to its own width (design.md CTA voice: a
-	   primary action is a button, not a bar); this is the one primary action on the panel, so it
-	   is sized to its label like every other button in the app instead of spanning the column. */
-	.apply-receiver-btn {
+	/* .field-stack's column stretches every child to its own width by default (flex-direction:
+	   column defaults align-items to stretch); a primary action is a button sized to its label,
+	   not a bar (design.md CTA voice), so every Apply button on this screen opts back out. */
+	.apply-btn {
 		align-self: flex-start;
 	}
 
@@ -549,16 +696,10 @@
 		container-type: inline-size;
 	}
 
-	/* Base size is `large` (set on the ArcDial elements themselves): at `compact` the half-ring's
+	/* Base size is `default` (set on the ArcDial elements themselves): at `compact` the half-ring's
 	   own caption and value text, drawn in the dial's fixed SVG viewBox, scaled down to a few
 	   pixels and read as unlabeled stumps. Dials shrink a tier before the panel needs to scroll
 	   (docs/architecture/ui-controls.md section 5), same rule as PerformanceScreen's own dial rows. */
-	@container (max-width: 460px) {
-		.dial-row {
-			--dial-size: var(--dial-default);
-		}
-	}
-
 	@container (max-width: 280px) {
 		.dial-row {
 			--dial-size: var(--dial-compact);
@@ -575,5 +716,156 @@
 		display: block;
 		margin-top: var(--space-3xs);
 		color: var(--color-faint);
+	}
+
+	/* --- Effect previews -----------------------------------------------------
+	   One drawn surface, reused at tile size (the effect picker) and strip size (the live
+	   preview): a per-effect [data-effect] attribute selects the background and animation, so
+	   the two call sites can never draw a different picture of the same effect. No preview image
+	   depicts these; the vendor's colors/color*.png files are flat swatches, not effect
+	   animations (see PROVENANCE.md), so the motion is drawn here instead. */
+	.preview-surface {
+		background: var(--color-paper-3);
+		border: 1px solid var(--color-rule-2);
+	}
+
+	.preview-surface[data-effect='rainbow'],
+	.preview-surface[data-effect='rainbowBreath'] {
+		background: linear-gradient(90deg, #ff3b30, #ff9500, #ffd60a, #34c759, #32ade6, #5e5ce6, #ff3b30);
+		background-size: 200% 100%;
+	}
+
+	.preview-surface[data-effect='singleColorBreath'],
+	.preview-surface[data-effect='fixed'] {
+		background: var(--tile-color, var(--color-accent));
+	}
+
+	.preview-surface[data-effect='neon'] {
+		background: linear-gradient(90deg, #ff2d95, #32ade6, #ff2d95, #32ade6);
+		background-size: 300% 100%;
+	}
+
+	@keyframes preview-scroll {
+		to {
+			background-position: -200% 0;
+		}
+	}
+
+	@keyframes preview-breathe {
+		0%,
+		100% {
+			opacity: 0.35;
+		}
+		50% {
+			opacity: 1;
+		}
+	}
+
+	@keyframes preview-strobe {
+		to {
+			background-position: -300% 0;
+		}
+	}
+
+	/* Looping animation is opt-in under reduced motion, same convention as ArcDial/RangeSlider/
+	   SegmentDial's own settle transitions: nothing here animates unless the viewer allows it. */
+	@media (prefers-reduced-motion: no-preference) {
+		.preview-surface[data-effect='rainbow'],
+		.preview-surface[data-effect='rainbowBreath'] {
+			animation: preview-scroll 2.2s linear infinite;
+		}
+
+		.preview-surface[data-effect='rainbowBreath'] {
+			animation:
+				preview-scroll 2.2s linear infinite,
+				preview-breathe 2s ease-in-out infinite;
+		}
+
+		.preview-surface[data-effect='singleColorBreath'] {
+			animation: preview-breathe 1.8s ease-in-out infinite;
+		}
+
+		.preview-surface[data-effect='neon'] {
+			animation: preview-strobe 0.8s steps(6) infinite;
+		}
+
+		.live-preview[data-effect] {
+			animation-duration: var(--preview-duration, 2s);
+		}
+	}
+
+	.preview-row {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3xs);
+	}
+
+	.live-preview {
+		height: 22px;
+		width: 100%;
+	}
+
+	/* The current brightness scales the strip's own intensity (the matching animation-duration
+	   override lives in the reduced-motion media query above); only meaningful once it is
+	   actually drawing an effect (data-effect is only set while lighting is on and a reading
+	   exists, see the markup), so an off/unread strip stays the flat, still base above rather
+	   than a bright loop pretending the mouse is lit. */
+	.live-preview[data-effect] {
+		opacity: var(--preview-opacity, 1);
+	}
+
+	/* --- Effect tile grid ------------------------------------------------------
+	   The mode picker: every effect the device supports as its own tile (design.md "no screen may
+	   hide a choice inside a control the operator has to open first"), not one option folded into
+	   a <select>. Built as an ARIA radiogroup of plain buttons with roving tabindex, so arrow keys
+	   move between tiles and Home/End jump to the ends, the same contract a native radio group
+	   gives. */
+	.effect-grid {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-2xs);
+	}
+
+	.effect-tile {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3xs);
+		flex: 1 1 30%;
+		min-width: 100px;
+		padding: var(--space-2xs);
+		background: var(--color-paper);
+		border: 1px solid var(--color-rule);
+		color: var(--color-ink-2);
+		font-family: var(--font-body);
+		text-align: left;
+		clip-path: polygon(0 0, calc(100% - var(--cut-chip)) 0, 100% var(--cut-chip), 100% 100%, 0 100%);
+		transition:
+			border-color var(--dur-settle) var(--ease-out),
+			background var(--dur-settle) var(--ease-out);
+	}
+
+	.effect-tile:hover:not(:disabled) {
+		border-color: var(--color-faint);
+	}
+
+	.effect-tile.active {
+		border-color: var(--color-accent);
+		background: var(--color-accent-soft);
+		color: var(--color-ink);
+	}
+
+	.effect-tile:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+
+	.effect-preview {
+		height: 16px;
+		width: 100%;
+	}
+
+	.effect-name {
+		font-size: var(--text-xs);
+		font-weight: 500;
 	}
 </style>

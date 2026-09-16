@@ -152,6 +152,17 @@
 		return text.length * TICK_CHAR_WIDTH;
 	}
 
+	/** A label's natural centre position (as a percent of the track's own width) pushed in from
+	 * either edge by half its own estimated width, so a label near an end never overflows its own
+	 * track into a neighbouring control (two RangeSliders sitting side by side, each with its
+	 * value near an end, used to overlap into each other's space). */
+	function clampLabelPct(rawPct: number, text: string): number {
+		if (wrapWidth <= 0) return rawPct;
+		const halfPct = (estimateLabelWidth(text) / 2 / wrapWidth) * 100;
+		if (halfPct * 2 >= 100) return 50;
+		return Math.min(100 - halfPct, Math.max(halfPct, rawPct));
+	}
+
 	/** Every tick gets a mark; only some get a text label once there is not enough width for all of
 	 * them to sit apart without touching. Always keeps the first and last (the scale's own ends)
 	 * and spaces the rest as evenly as possible among the indices that remain, rather than
@@ -279,7 +290,7 @@
 				<span
 					class="value-label mono"
 					class:clickable={!effectiveDisabled}
-					style="left: {(valueLabelX / VB_WIDTH) * 100}%"
+					style="left: {clampLabelPct((valueLabelX / VB_WIDTH) * 100, unknown ? '-' : formatValue(displayValue))}%"
 					aria-hidden="true"
 					onclick={startEditing}
 				>{unknown ? '-' : formatValue(displayValue)}</span>
@@ -352,8 +363,8 @@
 
 		<div class="tick-row" aria-hidden="true">
 			{#each visibleTickValues as tick (tick)}
-				{@const leftPct = ((INSET + fractionOf(tick) * (VB_WIDTH - 2 * INSET)) / VB_WIDTH) * 100}
-				<span class="tick-label mono" style="left: {leftPct}%">{formatValue(tick)}</span>
+				{@const rawPct = ((INSET + fractionOf(tick) * (VB_WIDTH - 2 * INSET)) / VB_WIDTH) * 100}
+				<span class="tick-label mono" style="left: {clampLabelPct(rawPct, formatValue(tick))}%">{formatValue(tick)}</span>
 			{/each}
 		</div>
 	</div>
@@ -426,7 +437,7 @@
 		top: 0;
 		transform: translateX(-50%);
 		font-size: var(--text-xs);
-		color: var(--color-muted);
+		color: var(--color-ink-2);
 		white-space: nowrap;
 		line-height: 1;
 		pointer-events: none;

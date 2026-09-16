@@ -47,17 +47,32 @@
 <div class="field">
 	<label class="field-label" class:sr-only={hideLabel} for={uid}>{label}</label>
 	{#if hint}<div class="field-hint">{hint}</div>{/if}
-	{#if unknown}
-		<select id={uid} disabled value="unknown">
-			<option value="unknown">{'-'}</option>
-		</select>
-	{:else}
-		<select id={uid} {disabled} value={String(value)} onchange={handleChange}>
-			{#each options as option (option.value)}
-				<option value={String(option.value)}>{option.label}</option>
-			{/each}
-		</select>
-	{/if}
+	<!-- appearance: none (app.css) strips the native dropdown arrow, so without one drawn here a
+	     select reads as a plain text box, not a control with more choices behind it. A plain
+	     angular chevron, never a rounded caret (design.md "Shape: nothing is round"). -->
+	<div class="select-shell">
+		{#if unknown}
+			<select id={uid} disabled value="unknown">
+				<option value="unknown">{'-'}</option>
+			</select>
+		{:else}
+			<select id={uid} {disabled} value={String(value)} onchange={handleChange}>
+				{#each options as option (option.value)}
+					<option value={String(option.value)}>{option.label}</option>
+				{/each}
+			</select>
+		{/if}
+		<svg class="chevron" width="10" height="6" viewBox="0 0 10 6" aria-hidden="true">
+			<path
+				d="M1 1l4 4 4-4"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.6"
+				stroke-linecap="square"
+				stroke-linejoin="miter"
+			/>
+		</svg>
+	</div>
 </div>
 
 <style>
@@ -71,5 +86,28 @@
 		clip: rect(0, 0, 0, 0);
 		white-space: nowrap;
 		border: 0;
+	}
+
+	.select-shell {
+		position: relative;
+		display: flex;
+	}
+
+	.select-shell select {
+		width: 100%;
+		padding-right: calc(var(--space-lg) + 2px);
+	}
+
+	.chevron {
+		position: absolute;
+		right: var(--space-xs);
+		top: 50%;
+		transform: translateY(-50%);
+		color: var(--color-muted);
+		pointer-events: none;
+	}
+
+	.select-shell select:disabled ~ .chevron {
+		opacity: 0.45;
 	}
 </style>

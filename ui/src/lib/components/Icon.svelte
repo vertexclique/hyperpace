@@ -44,6 +44,11 @@
 		<rect x="7" y="7" width="10" height="10" />
 		<path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
 		<path d="M5 5l2 2M19 5l-2 2M5 19l2-2M19 19l-2-2" />
+	{:else if name === 'data'}
+		<path d="M4 5.5h16v4H4z" />
+		<path d="M4 9.5h16v4H4z" />
+		<path d="M4 13.5h16v5H4z" />
+		<path d="M7.5 7.5h2M7.5 11.5h2M7.5 16h2" />
 	{:else if name === 'settings'}
 		<circle cx="12" cy="12" r="3" />
 		<g stroke-width="1.8">

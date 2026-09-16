@@ -17,46 +17,78 @@
 
 {#if percent !== null}
 	<div
-		class="battery chip chip-{tone}"
+		class="segment battery tone-{tone}"
 		title="Estimated from the device's voltage curve"
 		role="img"
 		aria-label="Battery {percent} percent{charging ? ', charging' : ''}"
 	>
 		<div class="meter" aria-hidden="true">
 			{#each segmentIndices as i (i)}
-				<span class="segment" class:filled={i < filled}></span>
+				<span class="cell" class:filled={i < filled}></span>
 			{/each}
 		</div>
 		<span class="percent mono">{percent}%</span>
+		<!-- Unmistakable, not just an icon: the operator's own complaint was that charging never
+		     showed at all. Always the ok colour, regardless of the percent's own tone, because an
+		     actively charging mouse is never the thing to flag as low. -->
 		{#if charging}
-			<svg class="bolt" width="8" height="11" viewBox="0 0 8 11" aria-hidden="true">
-				<polygon points="4.5,0 0,6.2 3,6.2 2,11 7.5,4.2 4.3,4.2" fill="currentColor" />
-			</svg>
+			<span class="charging">
+				<svg class="bolt" width="9" height="12" viewBox="0 0 8 11" aria-hidden="true">
+					<polygon points="4.5,0 0,6.2 3,6.2 2,11 7.5,4.2 4.3,4.2" fill="currentColor" />
+				</svg>
+				Charging
+			</span>
 		{/if}
 	</div>
 {/if}
 
 <style>
 	.battery {
-		gap: var(--space-2xs);
+		font-size: var(--text-xs);
 	}
 
-	/* Square-ended segments with tick divisions, never a rounded capsule (design.md "Shape"). A
+	/* Square-ended cells with tick divisions, never a rounded capsule (design.md "Shape"). A
 	   bitmap dial face (key/battery.png) exists but is built for the ~130px dial tier; shrunk to
-	   this rail's scale it reads as a muddy grey blob, so the meter is drawn instead. */
+	   this cluster's scale it reads as a muddy grey blob, so the meter is drawn instead. */
 	.meter {
 		display: flex;
 		gap: 1px;
-		height: 8px;
+		height: 9px;
 	}
 
-	.segment {
+	.cell {
 		width: 3px;
 		background: var(--color-rule);
 	}
 
-	.segment.filled {
-		background: currentColor;
+	.tone-ok .cell.filled {
+		background: var(--color-ok);
+	}
+
+	.tone-danger .cell.filled {
+		background: var(--color-danger);
+	}
+
+	.percent {
+		font-weight: 600;
+	}
+
+	.tone-ok .percent {
+		color: var(--color-ok);
+	}
+
+	.tone-danger .percent {
+		color: var(--color-danger);
+	}
+
+	.charging {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		color: var(--color-ok);
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
 	}
 
 	.bolt {

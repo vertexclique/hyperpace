@@ -306,7 +306,7 @@
 	}
 
 	.caption-label {
-		fill: var(--color-muted);
+		fill: var(--color-ink-2);
 		font-weight: 500;
 		text-anchor: middle;
 		dominant-baseline: middle;

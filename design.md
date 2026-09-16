@@ -112,19 +112,30 @@ catalogued in `ui/static/device/PROVENANCE.md`.
 
 ## Typography
 
-- Display: Space Grotesk, weight 600, roman. Screen titles and dial centre readouts.
-- Body: Geist, weight 400 and 500. Labels, descriptions, buttons.
+- Display: Chakra Petch, weight 600, roman. Screen titles and dial centre readouts. Its
+  letterforms carry the same chamfered cut corner as the mark and the cut plate, which is why it
+  replaced the earlier geometric-sans display face.
+- Body: Saira, weight 400 and 500. Labels, descriptions, buttons. A squared grotesque that stays
+  legible at small sizes, in the same family as the display face's angularity.
 - Numerics: JetBrains Mono, weight 500, `font-variant-numeric: tabular-nums`. Every value a
-  device reports: DPI, hertz, milliseconds, percent, version strings, byte counts.
+  device reports: DPI, hertz, milliseconds, percent, version strings, byte counts. A true
+  monospace, not Saira's own tabular figures, so a device readout stays visually distinct from a
+  label at a glance.
 - Display tracking: -0.02em at display sizes, 0 at body sizes.
 - Type scale anchor: `--text-display` = clamp(1.75rem, 1.4rem + 1.2vw, 2.25rem). This is an app,
   not a landing page: display type stays modest.
 
 Fonts are self-hosted and never fetched at runtime, because the app must render with no network.
-Installed: `@fontsource-variable/space-grotesk`, `@fontsource-variable/geist`,
-`@fontsource-variable/jetbrains-mono`, all 5.3.0, imported once in `ui/src/routes/+layout.svelte`.
-The CSS family names those packages register carry the `Variable` suffix, which is why the tokens
-below read "Space Grotesk Variable" and not "Space Grotesk".
+Installed: `@fontsource/chakra-petch` (600 weight only, the only weight the app uses),
+`@fontsource-variable/saira`, `@fontsource-variable/jetbrains-mono`, all 5.3.0, imported once in
+`ui/src/routes/+layout.svelte`. Chakra Petch ships no variable build, so its package registers the
+plain family name `Chakra Petch`; Saira and JetBrains Mono are variable packages and register
+their family names with the `Variable` suffix, which is why the tokens below read "Saira Variable"
+and "JetBrains Mono Variable" but plain "Chakra Petch". Saira's variable font does carry genuine
+tabular figures (its GSUB table exposes `tnum`), verified directly against the upstream binary
+rather than assumed; JetBrains Mono is used for numerics anyway; because a true monospace keeps
+the instrument-readout look design.md's `.mono` class describes, which Saira's proportional
+letterforms would not.
 
 ## Spacing
 
@@ -210,8 +221,8 @@ under `prefers-reduced-motion: reduce`.
   --color-danger:      oklch(66% 0.17 25);
   --color-ok:          oklch(78% 0.12 155);
 
-  --font-display: "Space Grotesk Variable", "Space Grotesk", sans-serif;
-  --font-body:    "Geist Variable", "Geist", system-ui, sans-serif;
+  --font-display: "Chakra Petch", sans-serif;
+  --font-body:    "Saira Variable", "Saira", system-ui, sans-serif;
   --font-mono:    "JetBrains Mono Variable", ui-monospace, monospace;
 
   --color-faint:        oklch(44% 0.012 258);
@@ -248,8 +259,8 @@ under `prefers-reduced-motion: reduce`.
     "accent": { "$value": "oklch(80% 0.14 200)", "$type": "color" }
   },
   "font": {
-    "display": { "$value": "Space Grotesk", "$type": "fontFamily" },
-    "body":    { "$value": "Geist", "$type": "fontFamily" },
+    "display": { "$value": "Chakra Petch", "$type": "fontFamily" },
+    "body":    { "$value": "Saira", "$type": "fontFamily" },
     "mono":    { "$value": "JetBrains Mono", "$type": "fontFamily" }
   },
   "space":  { "md": { "$value": "1.5rem", "$type": "dimension" } },
@@ -266,7 +277,7 @@ Every stylesheet in this project carries:
 /* Hallmark · genre: atmospheric · macrostructure: Workbench · design-system: design.md · designed-as-app
  * theme: custom · vibe: "deep space, starlight, instrument-grade, cold vacuum"
  * paper: oklch(14% 0.014 265) · accent: oklch(80% 0.14 200) · shape: cut plate, zero radius
- * display: Space Grotesk · body: Geist · mono: JetBrains Mono
+ * display: Chakra Petch · body: Saira · mono: JetBrains Mono
  * axes: dark / geometric-sans / cool · studied: no
  */
 ```

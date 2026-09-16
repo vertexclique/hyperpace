@@ -314,9 +314,11 @@
 						<span class="plate-title">{BUTTON_LABELS[selected] ?? `Button ${selected + 1}`}</span>
 					</div>
 				</div>
-				<p class="field-hint plate-subtitle">
-					Currently: {hasData && selectedAction ? actionSummary(selectedAction) : '-'}
-				</p>
+
+				<div class="binding-row">
+					<span class="field-label">Current binding</span>
+					<span class="binding-value">{hasData && selectedAction ? actionSummary(selectedAction) : '-'}</span>
+				</div>
 
 				<div class="grid">
 					<SelectField
@@ -524,6 +526,25 @@
 		margin-bottom: var(--space-sm);
 	}
 
+	/* The editor's one live reading: what the button is bound to right now, set apart from the
+	   Action picker below it as a clear value rather than a loose "Currently: ..." caption. */
+	.binding-row {
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-2xs);
+		padding: var(--space-2xs) var(--space-sm);
+		margin-bottom: var(--space-md);
+		background: var(--color-paper-3);
+		border: 1px solid var(--color-rule);
+	}
+
+	.binding-value {
+		font-family: var(--font-display);
+		font-size: var(--text-md);
+		font-weight: 600;
+		color: var(--color-ink);
+	}
+
 	.button-list {
 		list-style: none;
 		margin: 0;
@@ -568,6 +589,8 @@
 		display: flex;
 		gap: var(--space-2xs);
 		margin-top: var(--space-md);
+		padding-top: var(--space-md);
+		border-top: 1px solid var(--color-rule);
 	}
 
 	.error-text {

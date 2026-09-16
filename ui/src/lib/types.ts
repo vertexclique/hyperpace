@@ -20,12 +20,24 @@ export type LinkType =
 	| { kind: 'wireless8k' }
 	| { kind: 'unknown'; byte: number };
 
+/** What the connected model physically has; mirrors `ModelCapabilitiesDto`. */
+export interface ModelCapabilities {
+	/** Whether the mouse body has its own light strip. */
+	bodyLighting: boolean;
+	/** Whether the model has a DPI indicator light with its own effect. */
+	dpiIndicator: boolean;
+	/** Whether the model supports long range mode. */
+	longRange: boolean;
+}
+
 export interface DeviceIdentity {
 	cid: number;
 	mid: number;
 	link: LinkType;
 	maxPollingHz: number;
 	wired: boolean;
+	/** Null for a model no known table lists. */
+	capabilities: ModelCapabilities | null;
 }
 
 export interface Battery {
@@ -96,6 +108,12 @@ export interface ReceiverLight {
 	brightness: number;
 	time: number;
 }
+
+// Mirrors ReceiverLightStateDto (dto/device.rs): what reading the receiver's own light found.
+// 'reported' means the receiver answered with its light as it is set now, even while the mouse
+// sleeps; 'unsupported' means it marked the read unsupported (status 1), never rendered as a
+// zeroed-out reading.
+export type ReceiverLightState = { state: 'reported'; light: ReceiverLight } | { state: 'unsupported' };
 
 // ---- dto/settings.rs ----
 
@@ -453,4 +471,11 @@ export const DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT = 15;
 export const MACRO_NAME_MAX_BYTES = 30;
 export const MACRO_EVENT_MAX_COUNT = 70;
 
-export type ScreenId = 'buttons' | 'performance' | 'macros' | 'lighting' | 'firmware' | 'settings';
+export type ScreenId =
+	| 'buttons'
+	| 'performance'
+	| 'macros'
+	| 'lighting'
+	| 'firmware'
+	| 'data'
+	| 'settings';

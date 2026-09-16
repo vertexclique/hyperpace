@@ -39,6 +39,7 @@ import type {
 	MacroRecord,
 	PairState,
 	ReceiverLight,
+	ReceiverLightState,
 	SaveMacroRequest,
 	Settings,
 	SetButtonRequest,
@@ -165,6 +166,13 @@ class DeviceStore {
 	/** Another settings read is owed once the one in flight finishes; see `refreshSettings`. */
 	private settingsRefreshQueued = false;
 
+	/** The receiver's own light as `read_receiver_light` last reported it: null before the first
+	 * read completes, never a guessed default (see `readReceiverLight`). */
+	receiverLight = $state<ReceiverLightState | null>(null);
+	receiverLightLoading = $state(false);
+	/** Another receiver-light read is owed once the one in flight finishes; see `readReceiverLight`. */
+	private receiverLightRefreshQueued = false;
+
 	macros = $state<MacroRecord[]>([]);
 	macrosLoading = $state(false);
 
@@ -240,7 +248,10 @@ class DeviceStore {
 			// is what says the connection is ready: it is only reported once the device has answered
 			// and its settings are readable. Before that, reading would fail with "no device is
 			// connected", and the `connected` event this window is now subscribed to will do the read.
-			if (state.connected && state.identity) this.refreshSettingsInBackground();
+			if (state.connected && state.identity) {
+				this.refreshSettingsInBackground();
+				this.readReceiverLightInBackground();
+			}
 		} catch (err) {
 			this.fail('Could not read device state', err);
 		}
@@ -269,6 +280,7 @@ class DeviceStore {
 			this.applyDeviceState(state);
 			if (state.connected) {
 				await this.refreshSettings();
+				this.readReceiverLightInBackground();
 			}
 		} catch (err) {
 			this.fail('Could not connect', err);
@@ -285,6 +297,7 @@ class DeviceStore {
 			this.fail('Could not disconnect cleanly', err);
 		} finally {
 			this.settings = null;
+			this.receiverLight = null;
 		}
 	}
 
@@ -321,6 +334,39 @@ class DeviceStore {
 	 */
 	private refreshSettingsInBackground() {
 		void this.refreshSettings().catch(() => {});
+	}
+
+	/**
+	 * Re-reads the receiver's own light as `read_receiver_light` currently reports it. The
+	 * receiver answers this itself even while the mouse sleeps. Concurrency-safe like
+	 * `refreshSettings`: a call made while a read is already in flight does not start a second
+	 * one, it marks that another read is owed, so a push that arrives mid-read is never lost and
+	 * never turns into a burst of reads.
+	 */
+	async readReceiverLight() {
+		if (this.receiverLightLoading) {
+			this.receiverLightRefreshQueued = true;
+			return;
+		}
+		this.receiverLightLoading = true;
+		try {
+			this.receiverLight = await invoke<ReceiverLightState>('read_receiver_light');
+			this.recovered('Could not read receiver light');
+		} catch (err) {
+			this.fail('Could not read receiver light', err);
+		} finally {
+			this.receiverLightLoading = false;
+			if (this.receiverLightRefreshQueued) {
+				this.receiverLightRefreshQueued = false;
+				this.readReceiverLightInBackground();
+			}
+		}
+	}
+
+	/** Same rationale as `refreshSettingsInBackground`: a receiver-light read triggered by a
+	 * connection becoming ready rather than by a caller waiting on its result. */
+	private readReceiverLightInBackground() {
+		void this.readReceiverLight().catch(() => {});
 	}
 
 	/** Sends one `write_setting` command per request, then reconciles from a fresh read. */
@@ -394,6 +440,7 @@ class DeviceStore {
 	async setReceiverLight(light: ReceiverLight) {
 		try {
 			await invoke('receiver_light', { light });
+			await this.readReceiverLight();
 		} catch (err) {
 			this.fail('Could not set receiver light', err);
 		}
@@ -542,8 +589,9 @@ class DeviceStore {
 				this.online = true;
 				// This is the only signal a connection the app made on its own (at startup, or
 				// when the receiver was plugged back in) produces, so it is where those
-				// connections learn their settings are now readable.
+				// connections learn their settings (and the receiver's own light) are now readable.
 				this.refreshSettingsInBackground();
+				this.readReceiverLightInBackground();
 				return;
 			case 'battery':
 				this.battery = event.battery;

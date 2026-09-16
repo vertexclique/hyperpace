@@ -18,6 +18,18 @@ export interface DeviceStatusSource {
 	connected: boolean;
 	online: boolean;
 	identity: DeviceIdentity | null;
+	/** The settings read from the mouse, when they have been; the polling rate comes from here. */
+	settings: { pollingHz: number } | null;
+}
+
+/**
+ * The polling rate the mouse is set to, as a label, or null before its settings have been read.
+ *
+ * Never the link's ceiling (`identity.maxPollingHz`): "8000 Hz" beside the link reads as the rate
+ * the mouse is running at, and showed 8000 Hz to an operator who had just set 1000 Hz.
+ */
+function pollingLabel(device: DeviceStatusSource): string | null {
+	return device.settings ? `${device.settings.pollingHz} Hz` : null;
 }
 
 /**
@@ -43,8 +55,9 @@ export function statusLine(device: DeviceStatusSource, inShell: boolean): string
 		case 'awake': {
 			const identity = device.identity;
 			if (!identity) return 'Connected';
-			const link = identity.wired ? 'wired' : '2.4 GHz';
-			return `Connected, ${link}, up to ${identity.maxPollingHz} Hz`;
+			const link = identity.wired ? 'Connected by cable' : 'Connected over 2.4 GHz';
+			const polling = pollingLabel(device);
+			return polling ? `${link}, polling at ${polling}` : link;
 		}
 	}
 }
@@ -64,14 +77,17 @@ export function presenceLabel(presence: Presence): string {
 }
 
 /**
- * The link beside the presence chip, or null when there is nothing true to say: no connection, or
- * a connection whose identity has not resolved yet.
+ * The link and the polling rate beside the presence chip, or null when there is nothing true to
+ * say: no connection, or a connection whose identity has not resolved yet. The rate is left off
+ * until the settings have been read rather than filled with a stand-in.
  */
 export function linkDetail(device: DeviceStatusSource, inShell: boolean): string | null {
 	if (presenceOf(device, inShell) !== 'awake') return null;
 	const identity = device.identity;
 	if (!identity) return null;
-	return `${identity.wired ? 'Wired' : '2.4 GHz'} \u00b7 ${identity.maxPollingHz} Hz`;
+	const link = identity.wired ? 'Wired' : '2.4 GHz';
+	const polling = pollingLabel(device);
+	return polling ? `${link} \u00b7 ${polling}` : link;
 }
 
 /** The tone a presence carries, for the chip that shows it. */
