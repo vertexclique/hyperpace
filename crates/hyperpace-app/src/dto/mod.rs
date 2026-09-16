@@ -26,6 +26,6 @@ pub use macros::{MacroEventDto, MacroRecordDto, SaveMacroRequest};
 pub use settings::{
     ButtonActionDto, DpiActionDto, DpiIndicatorDto, DpiIndicatorModeDto, DpiStageDto, KeystrokeDto,
     LightModeDto, LightingDto, LodDto, LongRangeDto, MacroCyclesDto, ModifierDto, MouseButtonDto,
-    PerformanceDto, ScrollDirectionDto, SetButtonRequest, SettingsDto, SleepTimeDto,
+    PerformanceDto, ProfileDto, ScrollDirectionDto, SetButtonRequest, SettingsDto, SleepTimeDto,
     WriteSettingRequest,
 };

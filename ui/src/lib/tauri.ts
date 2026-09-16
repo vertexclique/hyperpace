@@ -10,7 +10,7 @@
 
 import { invoke as tauriInvoke, Channel } from '@tauri-apps/api/core';
 import type { CommandName } from './generated/commands';
-import type { DeviceEvent, FirmwareProgress } from './types';
+import type { DeviceEvent, FirmwareProgress, PairState } from './types';
 
 export { Channel };
 
@@ -52,5 +52,13 @@ export function openFirmwareProgressChannel(
 ): Channel<FirmwareProgress> {
 	const channel = new Channel<FirmwareProgress>();
 	channel.onmessage = onProgress;
+	return channel;
+}
+
+/** Opens a fresh channel for one `pair_receiver` call, streaming each `GetPairState` poll as it
+ * happens instead of only the final phase. */
+export function openPairStateChannel(onUpdate: (state: PairState) => void): Channel<PairState> {
+	const channel = new Channel<PairState>();
+	channel.onmessage = onUpdate;
 	return channel;
 }

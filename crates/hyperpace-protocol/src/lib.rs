@@ -49,7 +49,7 @@ pub use macros::{MacroEvent, MacroEventKind, MacroSlot};
 pub use model::{DpiRange, ModelTable, table_for};
 pub use response::{
     Battery, DeviceIdentity, LinkType, PairPhase, PairState, ProtocolError, StatusChanged, Version,
-    battery, identity, long_range, online, pair_state, status_changed, version,
+    battery, identity, long_range, online, pair_state, profile, status_changed, version,
 };
 pub use settings::{
     DpiIndicator, DpiIndicatorMode, DpiStage, LightMode, Lighting, Lod, Performance, ReceiverLight,

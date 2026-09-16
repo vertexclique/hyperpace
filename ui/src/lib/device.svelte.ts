@@ -5,7 +5,13 @@
 // invents a value: every field starts null/empty and is filled only from a
 // real command response.
 
-import { invoke, openDeviceEventChannel, openFirmwareProgressChannel, runningInTauri } from './tauri';
+import {
+	invoke,
+	openDeviceEventChannel,
+	openFirmwareProgressChannel,
+	openPairStateChannel,
+	runningInTauri
+} from './tauri';
 import {
 	AUTOSTART_KEY,
 	DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT,
@@ -152,6 +158,9 @@ class DeviceStore {
 	 * connected device currently reports, not the whole archive. */
 	firmwareUpdates = $state<FirmwareRecord[]>([]);
 	firmwareProgress = $state<FirmwareProgress | null>(null);
+	/** Every `GetPairState` update streamed while the most recent `pairReceiver` call runs, live
+	 * (phase and seconds remaining), not just its final result. Null before pairing has ever run. */
+	pairState = $state<PairState | null>(null);
 	/** Result of the most recent `checkFirmwarePublication` (route 1, "watch for publication").
 	 * Never implies a package was found; see its own `hasFindings`/`disclaimer` fields. */
 	firmwareWatchReport = $state<FirmwareWatchReport | null>(null);
@@ -294,11 +303,30 @@ class DeviceStore {
 		}
 	}
 
+	/** Starts pairing and streams every `GetPairState` poll into `pairState` as it happens
+	 * (`docs/research/mouse-protocol-v2.md` section 10.1), so the caller can render the real
+	 * phase and seconds remaining instead of a bare "starting" spinner. */
 	async pairReceiver(): Promise<PairState | undefined> {
+		this.pairState = null;
 		try {
-			return await invoke<PairState>('pair_receiver');
+			const channel = openPairStateChannel((state) => {
+				this.pairState = state;
+			});
+			const final = await invoke<PairState>('pair_receiver', { channel });
+			this.pairState = final;
+			return final;
 		} catch (err) {
 			this.fail('Could not start pairing', err);
+		}
+	}
+
+	/** Reads the keystroke or media chord currently bound to button `index`'s slot, regardless of
+	 * that button's current action type (the slot exists at a fixed address either way). */
+	async getButtonKeystroke(index: number): Promise<Keystroke | undefined> {
+		try {
+			return await invoke<Keystroke>('get_button_keystroke', { index });
+		} catch (err) {
+			this.fail('Could not read the keystroke slot', err);
 		}
 	}
 

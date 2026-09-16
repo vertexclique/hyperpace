@@ -26,6 +26,11 @@
 		appDirty = false;
 	});
 
+	$effect(() => {
+		const profile = device.settings?.profile;
+		if (profile && profile.state === 'active') profileIndex = profile.index;
+	});
+
 	// Real-device access always defaults to read-only (`device.connect`'s own default), matching
 	// the safety property: choosing "This device" is the explicit opt-in the contract requires,
 	// but it never implies write access.
@@ -153,21 +158,28 @@
 	<section class="panel">
 		<div class="panel-title">Profile</div>
 		<div class="panel-subtitle">Switch the device's active on-board profile.</div>
-		<div class="field-row">
-			<input
-				class="text-input"
-				type="number"
-				min="0"
-				max="7"
-				style="width:80px"
-				bind:value={profileIndex}
-				disabled={!device.connected}
-			/>
-			<button class="btn btn-primary" disabled={!device.connected || profileSaving} onclick={switchProfile}>
-				{profileSaving ? 'Switching...' : 'Switch profile'}
-			</button>
-		</div>
-		<p class="field-hint">The active profile is not yet reported by read_settings.</p>
+		{#if !device.connected}
+			<EmptyState title="No device connected" message="Connect a mouse to read and switch its profile." />
+		{:else if device.settingsLoading || !device.settings}
+			<EmptyState title="Reading settings" message="Fetching the active profile from the device." />
+		{:else if device.settings.profile.state === 'unsupported'}
+			<p class="field-hint">Profile switching is not supported on this device.</p>
+		{:else}
+			<div class="field-row">
+				<input
+					class="text-input"
+					type="number"
+					min="0"
+					max="7"
+					style="width:80px"
+					bind:value={profileIndex}
+				/>
+				<button class="btn btn-primary" disabled={profileSaving} onclick={switchProfile}>
+					{profileSaving ? 'Switching...' : 'Switch profile'}
+				</button>
+			</div>
+			<p class="field-hint">Currently profile {device.settings.profile.index}.</p>
+		{/if}
 	</section>
 
 	<section class="panel">

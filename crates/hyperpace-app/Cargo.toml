@@ -35,6 +35,13 @@ tauri-plugin-notification = "3.0.0-alpha.0"
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Structured logging facade (docs/plans/hyperpace.md's "Known gaps still open" table): already a
+# transitive dependency through tauri and its plugins, so this only names a version this crate
+# calls directly rather than pulling anything new in. "env-filter" is likewise already fully
+# resolved transitively (loom, a dev-dependency elsewhere in the graph, already enables it), so
+# reusing it here costs nothing extra.
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Only used to name the local firmware archive's files by content hash (`hyperpace-store`'s
 # `FirmwareRecord::sha256`); not used for anything security-sensitive.
 sha2 = "0.10"

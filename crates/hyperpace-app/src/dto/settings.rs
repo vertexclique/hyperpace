@@ -569,6 +569,8 @@ pub struct SettingsDto {
     pub dpi_indicator: DpiIndicatorDto,
     /// Long range mode: on, off, or unsupported on this device.
     pub long_range: LongRangeDto,
+    /// Active profile index, or unsupported on this device.
+    pub profile: ProfileDto,
 }
 
 impl From<Settings> for SettingsDto {
@@ -593,6 +595,10 @@ impl From<Settings> for SettingsDto {
             // overwritten by `commands::device::read_settings` immediately after, via a
             // `GetLongRangeMode` request; no other caller of this `From` impl observes it.
             long_range: LongRangeDto::Unsupported,
+            // Same reasoning as `long_range`: the active profile is a dedicated `GetCurrentConfig`
+            // request (section 10.2), not a flash offset, so this placeholder is overwritten by
+            // `commands::device::read_settings` immediately after.
+            profile: ProfileDto::Unsupported,
         }
     }
 }
@@ -655,6 +661,48 @@ impl From<KeystrokeDto> for Keystroke {
             media: keystroke.media,
         }
     }
+}
+
+impl From<Modifier> for ModifierDto {
+    fn from(modifier: Modifier) -> Self {
+        match modifier {
+            Modifier::LeftCtrl => Self::LeftCtrl,
+            Modifier::LeftShift => Self::LeftShift,
+            Modifier::LeftAlt => Self::LeftAlt,
+            Modifier::LeftWin => Self::LeftWin,
+            Modifier::RightCtrl => Self::RightCtrl,
+            Modifier::RightShift => Self::RightShift,
+            Modifier::RightAlt => Self::RightAlt,
+            Modifier::RightWin => Self::RightWin,
+        }
+    }
+}
+
+impl From<Keystroke> for KeystrokeDto {
+    fn from(keystroke: Keystroke) -> Self {
+        Self {
+            modifiers: keystroke.modifiers.into_iter().map(Into::into).collect(),
+            key: keystroke.key,
+            media: keystroke.media,
+        }
+    }
+}
+
+/// The active profile index, or unsupported. Not part of the flash shadow (section 10.2): a
+/// dedicated `GetCurrentConfig` (14) request, queried by [`crate::commands::device::read_settings`]
+/// alongside the shadow read and mirrored the same way as [`LongRangeDto`]. Unlike `LongRangeDto`,
+/// [`Self::Active`] carries data, so this is a tagged object on the wire rather than a bare string
+/// (the "Wire format" note, `docs/architecture/api-contract.md`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "camelCase")]
+pub enum ProfileDto {
+    /// The device answered `GetCurrentConfig` with an active profile index.
+    Active {
+        /// The active profile index.
+        index: u8,
+    },
+    /// The device answered status 1 (unsupported) to `GetCurrentConfig`.
+    Unsupported,
 }
 
 /// A `set_button` request: the action bound to `index`, and the keystroke chord to bind
@@ -892,6 +940,38 @@ mod tests {
             assert_eq!(back, indicator);
             assert_eq!(DpiIndicatorMode::from(back.mode), mode);
         }
+    }
+
+    #[test]
+    fn profile_dto_tags_the_active_variant_and_serializes_unsupported_as_an_object() {
+        let active = serde_json::to_value(ProfileDto::Active { index: 3 }).unwrap();
+        assert_eq!(active["state"], "active");
+        assert_eq!(active["index"], 3);
+
+        // Unlike LongRangeDto, ProfileDto::Active carries data, so even the fieldless variant
+        // stays a tagged object rather than becoming a bare string (the "Wire format" note).
+        let unsupported = serde_json::to_value(ProfileDto::Unsupported).unwrap();
+        assert_eq!(unsupported["state"], "unsupported");
+    }
+
+    #[test]
+    fn profile_dto_round_trips_through_json() {
+        for profile in [ProfileDto::Active { index: 5 }, ProfileDto::Unsupported] {
+            let json = serde_json::to_string(&profile).unwrap();
+            let back: ProfileDto = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, profile);
+        }
+    }
+
+    #[test]
+    fn keystroke_dto_round_trips_through_the_protocol_type() {
+        let dto = KeystrokeDto {
+            modifiers: vec![ModifierDto::LeftCtrl, ModifierDto::RightShift],
+            key: Some(4),
+            media: None,
+        };
+        let keystroke = Keystroke::from(dto.clone());
+        assert_eq!(KeystrokeDto::from(keystroke), dto);
     }
 
     #[test]

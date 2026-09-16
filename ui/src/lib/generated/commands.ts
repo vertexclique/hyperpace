@@ -15,6 +15,7 @@ export const COMMAND_NAMES = [
 	'read_settings',
 	'write_setting',
 	'set_button',
+	'get_button_keystroke',
 	'save_macro',
 	'list_macros',
 	'delete_macro',

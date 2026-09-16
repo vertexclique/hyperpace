@@ -173,6 +173,12 @@ export interface DpiIndicator {
 // 1 to GetLongRangeMode; a screen must show that honestly, never render it as an 'off' toggle.
 export type LongRange = 'on' | 'off' | 'unsupported';
 
+// ProfileDto::Active carries data, so unlike LongRange this stays a tagged object even for the
+// fieldless 'unsupported' variant (the "Wire format" note). 'unsupported' means the connected
+// model answered status 1 to GetCurrentConfig; a screen must show that honestly, never a silent
+// profile 0.
+export type Profile = { state: 'active'; index: number } | { state: 'unsupported' };
+
 export interface Performance {
 	on: boolean;
 	timeout: SleepTime;
@@ -241,6 +247,7 @@ export interface Settings {
 	sensorMode: number;
 	dpiIndicator: DpiIndicator;
 	longRange: LongRange;
+	profile: Profile;
 }
 
 export type Modifier =

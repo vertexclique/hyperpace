@@ -1,10 +1,76 @@
 <script lang="ts">
 	import { device } from '../device.svelte';
-	import type { ButtonAction, MacroCycles } from '../types';
+	import type { ButtonAction, Keystroke, MacroCycles, Modifier } from '../types';
 	import MouseArt from '../art/MouseArt.svelte';
 	import EmptyState from '../components/EmptyState.svelte';
 	import SelectField from '../components/SelectField.svelte';
 	import RangeField from '../components/RangeField.svelte';
+
+	const MODIFIER_OPTIONS: { value: Modifier; label: string }[] = [
+		{ value: 'leftCtrl', label: 'L Ctrl' },
+		{ value: 'leftShift', label: 'L Shift' },
+		{ value: 'leftAlt', label: 'L Alt' },
+		{ value: 'leftWin', label: 'L Win' },
+		{ value: 'rightCtrl', label: 'R Ctrl' },
+		{ value: 'rightShift', label: 'R Shift' },
+		{ value: 'rightAlt', label: 'R Alt' },
+		{ value: 'rightWin', label: 'R Win' }
+	];
+
+	function keyRange(start: number, count: number, label: (i: number) => string) {
+		return Array.from({ length: count }, (_, i) => ({ value: start + i, label: label(i) }));
+	}
+
+	// docs/research/mouse-protocol-v2.md 8.6: the shared keymap's 95 type-1 entries, HID
+	// keyboard-page (0x07) usage ids. Built from ranges instead of listed by hand to stay compact;
+	// each range's bounds are quoted from that section.
+	const KEY_OPTIONS: { value: number; label: string }[] = [
+		...keyRange(4, 26, (i) => String.fromCharCode(65 + i)), // A..Z, 4..29
+		...keyRange(30, 9, (i) => String(i + 1)), // 1..9, 30..38
+		{ value: 39, label: '0' },
+		{ value: 40, label: 'Enter' },
+		{ value: 41, label: 'Esc' },
+		{ value: 42, label: 'Backspace' },
+		{ value: 43, label: 'Tab' },
+		{ value: 44, label: 'Space' },
+		{ value: 45, label: '-' },
+		{ value: 46, label: '=' },
+		{ value: 47, label: '[' },
+		{ value: 48, label: ']' },
+		{ value: 49, label: '\\' },
+		{ value: 51, label: ';' },
+		{ value: 52, label: "'" },
+		{ value: 53, label: '`' },
+		{ value: 54, label: ',' },
+		{ value: 55, label: '.' },
+		{ value: 56, label: '/' },
+		{ value: 57, label: 'Caps Lock' },
+		...keyRange(58, 12, (i) => `F${i + 1}`), // F1..F12, 58..69
+		{ value: 70, label: 'Print Screen' },
+		{ value: 71, label: 'Scroll Lock' },
+		{ value: 72, label: 'Pause' },
+		{ value: 73, label: 'Insert' },
+		{ value: 74, label: 'Home' },
+		{ value: 75, label: 'Page Up' },
+		{ value: 76, label: 'Delete' },
+		{ value: 77, label: 'End' },
+		{ value: 78, label: 'Page Down' },
+		{ value: 79, label: 'Right' },
+		{ value: 80, label: 'Left' },
+		{ value: 81, label: 'Down' },
+		{ value: 82, label: 'Up' },
+		{ value: 83, label: 'Num Lock' },
+		{ value: 84, label: 'Keypad /' },
+		{ value: 85, label: 'Keypad *' },
+		{ value: 86, label: 'Keypad -' },
+		{ value: 87, label: 'Keypad +' },
+		{ value: 88, label: 'Keypad Enter' },
+		...keyRange(89, 9, (i) => `Keypad ${i + 1}`), // Keypad 1..9, 89..97
+		{ value: 98, label: 'Keypad 0' },
+		{ value: 99, label: 'Keypad .' }
+	];
+
+	const EMPTY_KEYSTROKE: Keystroke = { modifiers: [], key: null, media: null };
 
 	// docs/research/mouse-protocol-v2.md 8.5, NEW medias list. HID Consumer
 	// usage ids; labelled by usage, not by the vendor's (sometimes swapped)
@@ -50,6 +116,12 @@
 	let draft = $state<ButtonAction | null>(null);
 	let saving = $state(false);
 
+	// The keystroke slot at the selected button's index (docs/research/mouse-protocol-v2.md
+	// section 8.4): read back through get_button_keystroke so the chord editor and the media-key
+	// select start from what the device actually holds, not a blank slate.
+	let keystrokeDraft = $state<Keystroke>({ ...EMPTY_KEYSTROKE });
+	let keystrokeLoaded = $state(false);
+
 	let buttons = $derived(device.settings?.buttons ?? []);
 	let selectedAction = $derived(selected !== null ? (buttons[selected] ?? null) : null);
 
@@ -57,8 +129,28 @@
 		draft = selectedAction ? structuredClone(selectedAction) : null;
 	});
 
+	async function loadKeystroke(index: number) {
+		keystrokeLoaded = false;
+		const keystroke = await device.getButtonKeystroke(index);
+		keystrokeDraft = keystroke ?? { ...EMPTY_KEYSTROKE };
+		keystrokeLoaded = true;
+		// A media-bound slot already carries its usage id; prefill the select with it instead of
+		// defaulting to the first entry in the list.
+		if (draft && draft.type === 'media' && keystrokeDraft.media !== null) {
+			draft = { ...draft, usage: keystrokeDraft.media };
+		}
+	}
+
 	function selectHotspot(index: number) {
 		selected = index;
+		void loadKeystroke(index);
+	}
+
+	function toggleModifier(modifier: Modifier, on: boolean) {
+		const set = new Set(keystrokeDraft.modifiers);
+		if (on) set.add(modifier);
+		else set.delete(modifier);
+		keystrokeDraft = { ...keystrokeDraft, modifiers: [...set] };
 	}
 
 	function setKind(type: ButtonAction['type']) {
@@ -103,7 +195,14 @@
 		if (selected === null || !draft) return;
 		saving = true;
 		try {
-			await device.setButton(selected, draft);
+			let keystroke: Keystroke | undefined;
+			if (draft.type === 'keystroke') {
+				keystroke = keystrokeDraft;
+			} else if (draft.type === 'media') {
+				keystroke = { modifiers: [], key: null, media: draft.usage };
+			}
+			await device.setButton(selected, draft, keystroke);
+			await loadKeystroke(selected);
 		} finally {
 			saving = false;
 		}
@@ -234,10 +333,30 @@
 							onchange={(v) => draft && draft.type === 'fire' && (draft.intervalMs = v)}
 						/>
 					{:else if draft.type === 'keystroke'}
+						<div class="field-label">Modifiers</div>
+						<div class="modifier-grid">
+							{#each MODIFIER_OPTIONS as mod (mod.value)}
+								<label class="modifier-check">
+									<input
+										type="checkbox"
+										checked={keystrokeDraft.modifiers.includes(mod.value)}
+										onchange={(e) =>
+											toggleModifier(mod.value, (e.target as HTMLInputElement).checked)}
+									/>
+									{mod.label}
+								</label>
+							{/each}
+						</div>
+						<SelectField
+							label="Key"
+							value={keystrokeDraft.key ?? -1}
+							options={[{ value: -1, label: 'None' }, ...KEY_OPTIONS]}
+							onchange={(v) => (keystrokeDraft = { ...keystrokeDraft, key: v === -1 ? null : v })}
+						/>
 						<p class="field-hint">
-							Key assignment needs a keystroke-slot Tauri command; the fixed command surface in
-							docs/architecture/api-contract.md does not yet expose one. The button can be set to
-							type Keystroke, but its key content cannot be edited from this screen yet.
+							{keystrokeLoaded
+								? "Apply saves this chord to the button's keystroke slot."
+								: 'Reading the chord currently saved on the device...'}
 						</p>
 					{:else if draft.type === 'macro'}
 						<RangeField
@@ -357,5 +476,19 @@
 	.error-text {
 		color: var(--danger);
 		margin-top: 10px;
+	}
+
+	.modifier-grid {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 6px 10px;
+	}
+
+	.modifier-check {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 12.5px;
+		color: var(--text-faint);
 	}
 </style>

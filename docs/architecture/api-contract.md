@@ -61,6 +61,7 @@ pub fn battery(&Frame) -> Result<Battery, ProtocolError>;   // reads 4 payload b
 pub fn version(&Frame) -> Result<Version, ProtocolError>;
 pub fn online(&Frame) -> Result<(bool, [u8; 3]), ProtocolError>;
 pub fn long_range(&Frame) -> Result<bool, ProtocolError>;   // command 23; status 1 -> Err(Unsupported)
+pub fn profile(&Frame) -> Result<u8, ProtocolError>;        // command 14; status 1 -> Err(Unsupported)
 
 // model.rs
 pub struct ModelTable { pub cid: u8, pub mid: u8, pub buttons: u8, pub max_dpi: u32,
@@ -144,6 +145,7 @@ pub struct DeviceHandle;      // cheap clone, talks to the owner thread over cha
 impl DeviceHandle {
     pub fn request(&self, frame: Frame, timeout: Duration) -> Result<Frame, DeviceError>;
     pub fn read_settings(&self) -> Result<Shadow, DeviceError>;
+    pub fn read_block(&self, address: u16, len: usize) -> Result<Vec<u8>, DeviceError>;
     pub fn write_scalar(&self, address: u16, value: u8) -> Result<(), DeviceError>;
     pub fn write_block(&self, address: u16, data: &[u8]) -> Result<(), DeviceError>;
     pub fn events(&self) -> Receiver<DeviceEvent>;
@@ -158,7 +160,13 @@ pub fn watch() -> Result<Receiver<HotplugEvent>, DeviceError>;   // watcher star
 
 Rules: one owner thread per device; writes serialized by construction; requests matched by command
 byte; pushes (command 10) dispatched as events and never consumed as a reply; a write attempted
-under `Access::ReadOnly` returns `DeviceError::ReadOnly` without touching the transport.
+under `Access::ReadOnly` returns `DeviceError::ReadOnly` without touching the transport;
+`read_block` is never refused under `Access::ReadOnly` (reading flash is not a write) and reaches
+offsets the connect walk's fixed 256-byte span never covers (the keystroke and macro regions start
+at offset 256), mirroring every byte it reads into the shadow so a later `read_settings` reflects
+it too. A `FactoryReset` (9) request the device did not mark unsupported discards the cached shadow
+and restarts the base settings walk, matching the protocol's own documented "re-read flash" step
+(`docs/research/mouse-protocol-v2.md` section 10.3).
 
 ## hyperpace-firmware
 
@@ -225,10 +233,23 @@ file store behind the same `Store` API, and that switch is logged as a decision.
 
 Tauri commands (all async, all returning `Result<T, String>` rendered for the UI):
 `list_devices`, `connect`, `disconnect`, `device_state`, `read_settings`, `write_setting`,
-`set_button`, `save_macro`, `list_macros`, `delete_macro`, `set_profile`, `factory_reset`,
-`pair_receiver`, `receiver_light`, `export_config`, `import_config`, `firmware_list`,
-`firmware_import`, `firmware_install`, `firmware_check_for_updates`, `firmware_watch_check`,
-`app_settings`.
+`set_button`, `get_button_keystroke`, `save_macro`, `list_macros`, `delete_macro`, `set_profile`,
+`factory_reset`, `pair_receiver`, `receiver_light`, `export_config`, `import_config`,
+`firmware_list`, `firmware_import`, `firmware_install`, `firmware_check_for_updates`,
+`firmware_watch_check`, `app_settings`.
+
+`get_button_keystroke(index: u8) -> KeystrokeDto` reads button `index`'s 32-byte keystroke slot
+(section 8.4) through `DeviceHandle::read_block`, independent of that button's current
+`ButtonActionDto` (the slot exists at a fixed address either way); `set_button`'s existing
+`keystroke` field remains the one write path (`apply_set_button` already wrote it), so no separate
+`set_keystroke` command exists.
+
+`pair_receiver(channel: Channel<PairStateDto>) -> PairStateDto` sends `DongleEnterPair`, then polls
+`GetPairState` once a second (section 10.1), sending every intermediate `PairStateDto` through
+`channel` as it is read (the same progress-channel shape `firmware_install` already uses for
+`Channel<FirmwareProgressPayload>`), and returns the final state once the device reports
+`Succeeded`/`Failed` or 20 polls pass without either (section 10.1: "20 ticks force Fail", which
+this command then reports as `Failed` itself).
 
 `firmware_check_for_updates` compares the local archive against the connected device only; it is
 not an acquisition route. `firmware_watch_check` is route 1 ("watch for publication"): it fetches
@@ -251,10 +272,12 @@ and derives `#[serde(rename_all = "camelCase")]`, so every JSON field name the U
 the Rust field name with its first letter lowercased and underscores removed (`real_device` ->
 `realDevice`). A tagged enum (`WriteSettingRequest`, `ButtonActionDto`, `DeviceEventPayload`,
 `LodDto`/`SleepTimeDto`/`LightModeDto`/`LinkTypeDto`/`PairPhaseDto`/`MacroCyclesDto`/
-`DpiIndicatorModeDto`, `AppSettingsRequest`) always serializes to a JSON *object* carrying its own
-`tag` key (`"type"`, `"key"`, `"mode"`, `"value"`, `"kind"`, `"phase"`, `"cycles"`, `"action"`
-respectively) even for a variant with no data (`DeviceEvent::Offline` is `{"type":"offline"}`,
-never the bare string `"Offline"`); an enum with no `tag` attribute (`AccessDto`,
+`DpiIndicatorModeDto`, `AppSettingsRequest`, `ProfileDto`) always serializes to a JSON *object*
+carrying its own `tag` key (`"type"`, `"key"`, `"mode"`, `"value"`, `"kind"`, `"phase"`, `"cycles"`,
+`"action"`, `"state"` respectively) even for a variant with no data (`DeviceEvent::Offline` is
+`{"type":"offline"}`, never the bare string `"Offline"`; `ProfileDto::Unsupported` is
+`{"state":"unsupported"}`, never the bare string `"unsupported"`, because its sibling
+`ProfileDto::Active` carries data); an enum with no `tag` attribute (`AccessDto`,
 `DeviceBackendDto`, `MouseButtonDto`, `DpiActionDto`, `ScrollDirectionDto`, `ModifierDto`,
 `LongRangeDto`) serializes as a bare camelCase string instead, since every one of those is fully
 fieldless. A `(u8, u8, u8)` color field serializes as a 3-element JSON array, never a `{r,g,b}`
@@ -273,6 +296,13 @@ honesty fence, `CLAUDE.md` section 8). `write_setting` gains five matching varia
 plain scalar writes), `dpiIndicatorOn` (`{key, on}`), and `longRange` (`{key, on}`, routed through
 `DeviceHandle::request(request::set_long_range(..))`, not `write_scalar`, since it addresses no
 flash offset).
+
+`SettingsDto` also carries `profile: ProfileDto` (`{state: "active", index: u8}` or
+`{state: "unsupported"}`), filled the same way as `long_range`: `SettingsDto::from(Settings)` sets
+a placeholder (`ProfileDto::Unsupported`) that `read_settings` overwrites via a dedicated
+`GetCurrentConfig` (14) request, since the active profile has no flash address either (section
+10.2). There is no `write_setting` variant for it: `set_profile(index: u8)` is the one write path,
+unchanged.
 
 `FirmwareWatchReportDto` (`firmware_watch_check`'s return) flattens `hyperpace_firmware::watch`'s
 `ConfigFinding`/`DirectoryFinding` into plain structs carrying a pre-rendered `summary` (that

@@ -7,12 +7,14 @@
 //! gate the device layer already enforces is the only one, never a second copy that could drift
 //! from it.
 
+use std::time::Duration;
+
 use hyperpace_device::DeviceHandle;
 use hyperpace_protocol::settings::SHADOW_LEN;
 use hyperpace_protocol::{
-    ButtonAction, Command, DpiIndicatorMode, Keystroke, LightMode, Lod, ModelTable, ProtocolError,
-    ReceiverLight, SleepTime, config_file, dpi_to_bytes, indicator_brightness_to_byte, offset,
-    polling_to_byte, request, response, struct_check,
+    ButtonAction, Command, DpiIndicatorMode, Frame, Keystroke, LightMode, Lod, ModelTable,
+    PairPhase, ProtocolError, ReceiverLight, SleepTime, Status, config_file, dpi_to_bytes,
+    indicator_brightness_to_byte, offset, polling_to_byte, request, response, struct_check,
 };
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State, Window};
@@ -20,11 +22,19 @@ use tauri::{AppHandle, Manager, State, Window};
 use crate::blocking::blocking;
 use crate::dto::{
     ConnectRequest, DeviceBackendDto, DeviceDescriptor, DeviceEventPayload, DeviceStateDto,
-    LightingDto, LongRangeDto, PairStateDto, ReceiverLightDto, SetButtonRequest, SettingsDto,
-    WriteSettingRequest,
+    KeystrokeDto, LightingDto, LongRangeDto, PairPhaseDto, PairStateDto, ProfileDto,
+    ReceiverLightDto, SetButtonRequest, SettingsDto, WriteSettingRequest,
 };
 use crate::error::{AppError, to_command_result};
 use crate::state::{AppState, REQUEST_TIMEOUT};
+
+/// How often [`pair_receiver`] polls `GetPairState` once a pairing session has started, matching
+/// the vendor driver's own cadence (`docs/research/mouse-protocol-v2.md` section 10.1: "1 s
+/// poll").
+const PAIR_POLL_INTERVAL: Duration = Duration::from_secs(1);
+/// Polls [`pair_receiver`] allows before giving up and reporting failure itself, matching the
+/// vendor driver's own cap (section 10.1: "20 ticks force Fail").
+const MAX_PAIR_POLLS: u32 = 20;
 
 /// List the connection options `connect` accepts. Static: neither backend can be probed without
 /// either opening the real device (never done outside an explicit `connect`) or already holding a
@@ -93,14 +103,15 @@ pub async fn device_state(
 
 /// Read every setting from the connected device.
 ///
-/// Long range (`docs/research/mouse-protocol-v2.md` section 7.9) is not part of the flash shadow
-/// [`SettingsDto::from`] converts, so it is queried separately with a dedicated
-/// `GetLongRangeMode` (23) request and merged in.
+/// Long range (`docs/research/mouse-protocol-v2.md` section 7.9) and the active profile (section
+/// 10.2) are not part of the flash shadow [`SettingsDto::from`] converts, so each is queried
+/// separately with its own dedicated request (`GetLongRangeMode`/`GetCurrentConfig`) and merged
+/// in.
 ///
 /// # Errors
 ///
 /// Returns an error message when no device is connected, its model is unrecognized, or the
-/// device did not answer either read in time.
+/// device did not answer any of the reads in time.
 #[tauri::command]
 pub async fn read_settings(app: AppHandle) -> Result<SettingsDto, String> {
     to_command_result(
@@ -110,10 +121,57 @@ pub async fn read_settings(app: AppHandle) -> Result<SettingsDto, String> {
             let shadow = handle.read_settings()?;
             let mut dto = SettingsDto::from(shadow.settings(table)?);
             dto.long_range = query_long_range(&handle)?;
+            dto.profile = query_profile(&handle)?;
             Ok(dto)
         })
         .await,
     )
+}
+
+/// Read the keystroke or media chord bound to button `index`'s slot
+/// (`docs/research/mouse-protocol-v2.md` section 8.4). The slot exists at a fixed address for
+/// every index regardless of that button's current action type, so this reads it independent of
+/// whether the button is currently bound to type 5 ([`hyperpace_protocol::ButtonAction::Keystroke`]
+/// or [`hyperpace_protocol::ButtonAction::Media`]).
+///
+/// # Errors
+///
+/// Returns an error message when no device is connected, `index` is at or past the connected
+/// model's button count, or the device did not answer the read in time.
+#[tauri::command]
+pub async fn get_button_keystroke(app: AppHandle, index: u8) -> Result<KeystrokeDto, String> {
+    to_command_result(
+        blocking(move || {
+            let state = app.state::<AppState>();
+            let (handle, table, ..) = state.connected_model()?;
+            read_keystroke(&handle, table, index)
+        })
+        .await,
+    )
+}
+
+/// Read `index`'s 32-byte keystroke slot (`offset::KEYSTROKE + 32 * index`) through
+/// [`hyperpace_device::DeviceHandle::read_block`], which reaches past the connect walk's 256-byte
+/// span, and decode it.
+///
+/// # Errors
+///
+/// Returns [`AppError::Protocol`] when `index` is at or past `table`'s button count or the slot
+/// bytes do not decode, and otherwise whatever [`hyperpace_device::DeviceError`] the read reports.
+fn read_keystroke(
+    handle: &DeviceHandle,
+    table: &ModelTable,
+    index: u8,
+) -> Result<KeystrokeDto, AppError> {
+    if index >= table.buttons {
+        return Err(ProtocolError::InvalidValue {
+            field: "button index",
+        }
+        .into());
+    }
+    let address = offset::KEYSTROKE + u16::from(index) * 32;
+    let bytes = handle.read_block(address, 32)?;
+    Ok(KeystrokeDto::from(Keystroke::decode(&bytes)?))
 }
 
 /// Query `GetLongRangeMode` (23) and map its reply to [`LongRangeDto`].
@@ -135,6 +193,41 @@ fn query_long_range(handle: &DeviceHandle) -> Result<LongRangeDto, AppError> {
         Err(ProtocolError::Unsupported { .. }) => Ok(LongRangeDto::Unsupported),
         Err(other) => Err(other.into()),
     }
+}
+
+/// Query `GetCurrentConfig` (14) and map its reply to [`ProfileDto`].
+///
+/// A status-1 reply is not an error here: it marks profile switching unsupported on this device
+/// (section 10.2), and [`read_settings`] must still return the rest of the snapshot, honestly
+/// marked [`ProfileDto::Unsupported`] rather than a silent profile 0 (the honesty fence).
+///
+/// # Errors
+///
+/// Returns [`AppError::Device`] when the request itself could not complete.
+fn query_profile(handle: &DeviceHandle) -> Result<ProfileDto, AppError> {
+    let reply = handle.request(Command::GetProfile.request(), REQUEST_TIMEOUT)?;
+    match response::profile(&reply) {
+        Ok(index) => Ok(ProfileDto::Active { index }),
+        Err(ProtocolError::Unsupported { .. }) => Ok(ProfileDto::Unsupported),
+        Err(other) => Err(other.into()),
+    }
+}
+
+/// Returns [`AppError::Protocol`] wrapping [`ProtocolError::Unsupported`] when `frame`'s status
+/// marks its command unsupported. [`FactoryReset`](Command::FactoryReset),
+/// [`SetReceiverLight`](Command::SetReceiverLight) and [`EnterPair`](Command::EnterPair) have no
+/// dedicated reply parser in `hyperpace_protocol` (they carry no payload worth decoding), so
+/// without this check a status-1 reply from a model that lacks the feature would read back as a
+/// bare `Ok(())`: a false success rather than the honest "unsupported" the doctrine requires
+/// (`CLAUDE.md` section 8).
+fn require_supported(frame: &Frame) -> Result<(), AppError> {
+    if frame.status() == Status::Unsupported {
+        return Err(ProtocolError::Unsupported {
+            command: frame.command,
+        }
+        .into());
+    }
+    Ok(())
 }
 
 /// Write one named setting to the connected device.
@@ -196,59 +289,115 @@ pub async fn set_profile(app: AppHandle, index: u8) -> Result<(), String> {
 ///
 /// # Errors
 ///
-/// Returns an error message when no device is connected, the connection is read-only, or the
-/// request was not acknowledged in time.
+/// Returns an error message when no device is connected, the connection is read-only, the device
+/// marked factory reset unsupported, or the request was not acknowledged in time.
 #[tauri::command]
 pub async fn factory_reset(app: AppHandle) -> Result<(), String> {
     to_command_result(
         blocking(move || {
             let state = app.state::<AppState>();
             let handle = state.handle()?;
-            handle.request(Command::FactoryReset.request(), REQUEST_TIMEOUT)?;
-            Ok(())
+            apply_factory_reset(&handle)
         })
         .await,
     )
 }
 
-/// Start receiver pairing and report the resulting pairing state.
+/// Send `FactoryReset` (9) and report honestly when the device marked it unsupported, instead of
+/// the false success a caller would see from discarding the reply's status.
+fn apply_factory_reset(handle: &DeviceHandle) -> Result<(), AppError> {
+    let reply = handle.request(Command::FactoryReset.request(), REQUEST_TIMEOUT)?;
+    require_supported(&reply)
+}
+
+/// Start receiver pairing, streaming every `GetPairState` update through `channel` as it is
+/// polled, and return the final state once pairing succeeds, fails, or `MAX_PAIR_POLLS` polls
+/// have run without either (`docs/research/mouse-protocol-v2.md` section 10.1).
 ///
 /// # Errors
 ///
-/// Returns an error message when no device is connected, the connection is read-only, or either
-/// request was not acknowledged in time.
+/// Returns an error message when no device is connected, the connection is read-only, the device
+/// marked pairing unsupported, or a request was not acknowledged in time.
 #[tauri::command]
-pub async fn pair_receiver(app: AppHandle) -> Result<PairStateDto, String> {
+pub async fn pair_receiver(
+    app: AppHandle,
+    channel: Channel<PairStateDto>,
+) -> Result<PairStateDto, String> {
     to_command_result(
         blocking(move || {
             let state = app.state::<AppState>();
             let handle = state.handle()?;
-            handle.request(Command::EnterPair.request(), REQUEST_TIMEOUT)?;
-            let reply = handle.request(Command::PairState.request(), REQUEST_TIMEOUT)?;
-            Ok(response::pair_state(&reply)?.into())
+            run_pairing(&handle, PAIR_POLL_INTERVAL, MAX_PAIR_POLLS, |update| {
+                let _ = channel.send(update);
+            })
         })
         .await,
     )
+}
+
+/// Send `EnterPair` (5), then poll `GetPairState` (6) every `poll_interval`, calling `on_update`
+/// with each phase seen, until the device reports [`PairPhase::Succeeded`] or [`PairPhase::Failed`]
+/// or `max_polls` is reached without either, which this function then reports as
+/// [`PairPhaseDto::Failed`] itself (section 10.1: "20 ticks force Fail"). Kept separate from the
+/// `#[tauri::command]` wrapper so it is testable against the simulator with a zero `poll_interval`
+/// instead of the real cadence.
+///
+/// # Errors
+///
+/// Returns [`AppError::Device`] when a request could not complete, and honestly propagates a
+/// status-1 (unsupported) `EnterPair` reply rather than polling a session that never started.
+fn run_pairing(
+    handle: &DeviceHandle,
+    poll_interval: Duration,
+    max_polls: u32,
+    mut on_update: impl FnMut(PairStateDto),
+) -> Result<PairStateDto, AppError> {
+    let enter_reply = handle.request(Command::EnterPair.request(), REQUEST_TIMEOUT)?;
+    require_supported(&enter_reply)?;
+
+    for _ in 0..max_polls {
+        let reply = handle.request(Command::PairState.request(), REQUEST_TIMEOUT)?;
+        let pair_state = response::pair_state(&reply)?;
+        let dto = PairStateDto::from(pair_state);
+        on_update(dto);
+        if matches!(pair_state.state, PairPhase::Succeeded | PairPhase::Failed) {
+            return Ok(dto);
+        }
+        std::thread::sleep(poll_interval);
+    }
+
+    let timed_out = PairStateDto {
+        state: PairPhaseDto::Failed,
+        seconds_left: 0,
+    };
+    on_update(timed_out);
+    Ok(timed_out)
 }
 
 /// Set the receiver's own indicator light.
 ///
 /// # Errors
 ///
-/// Returns an error message when no device is connected, the connection is read-only, or the
-/// request was not acknowledged in time.
+/// Returns an error message when no device is connected, the connection is read-only, the device
+/// marked the receiver light unsupported, or the request was not acknowledged in time.
 #[tauri::command]
 pub async fn receiver_light(app: AppHandle, light: ReceiverLightDto) -> Result<(), String> {
     to_command_result(
         blocking(move || {
             let state = app.state::<AppState>();
             let handle = state.handle()?;
-            let light: ReceiverLight = light.into();
-            handle.request(request::receiver_light(&light), REQUEST_TIMEOUT)?;
-            Ok(())
+            apply_receiver_light(&handle, light.into())
         })
         .await,
     )
+}
+
+/// Send `SetDongleLight` (24) and report honestly when the device marked it unsupported (the NEW
+/// driver's hardware "has no receiver-light commands", section 10.5), instead of the false success
+/// a caller would see from discarding the reply's status.
+fn apply_receiver_light(handle: &DeviceHandle, light: ReceiverLight) -> Result<(), AppError> {
+    let reply = handle.request(request::receiver_light(&light), REQUEST_TIMEOUT)?;
+    require_supported(&reply)
 }
 
 /// Export the connected device's full settings shadow as a `.bin` config file.
@@ -703,5 +852,128 @@ mod tests {
             query_long_range(&handle).unwrap(),
             LongRangeDto::Unsupported
         );
+    }
+
+    #[test]
+    fn query_profile_reads_the_active_index_and_reports_unsupported_honestly() {
+        let (handle, controller) = connected_handle_with_controller();
+        assert_eq!(
+            query_profile(&handle).unwrap(),
+            ProfileDto::Active { index: 0 }
+        );
+
+        handle
+            .request(request::set_profile(2), REQUEST_TIMEOUT)
+            .unwrap();
+        assert_eq!(
+            query_profile(&handle).unwrap(),
+            ProfileDto::Active { index: 2 }
+        );
+
+        controller.set_unsupported(14, true);
+        assert_eq!(query_profile(&handle).unwrap(), ProfileDto::Unsupported);
+    }
+
+    #[test]
+    fn read_keystroke_reads_back_a_previously_written_chord() {
+        let handle = connected_handle();
+        let keystroke = crate::dto::KeystrokeDto {
+            modifiers: vec![
+                crate::dto::ModifierDto::LeftCtrl,
+                crate::dto::ModifierDto::LeftShift,
+            ],
+            key: Some(4),
+            media: None,
+        };
+        apply_set_button(
+            &handle,
+            SetButtonRequest {
+                index: 0,
+                action: ButtonActionDto::Keystroke,
+                keystroke: Some(keystroke.clone()),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            read_keystroke(&handle, &CID_62_MID_1, 0).unwrap(),
+            keystroke
+        );
+    }
+
+    #[test]
+    fn read_keystroke_refuses_an_index_past_the_model_button_count() {
+        let handle = connected_handle();
+        let error = read_keystroke(&handle, &CID_62_MID_1, CID_62_MID_1.buttons).unwrap_err();
+        assert!(matches!(error, AppError::Protocol(_)));
+    }
+
+    #[test]
+    fn apply_factory_reset_reports_unsupported_honestly_not_as_a_false_success() {
+        let (handle, controller) = connected_handle_with_controller();
+        controller.set_unsupported(9, true);
+        let error = apply_factory_reset(&handle).unwrap_err();
+        assert!(matches!(
+            error,
+            AppError::Protocol(ProtocolError::Unsupported { command: 9 })
+        ));
+    }
+
+    #[test]
+    fn apply_receiver_light_reports_unsupported_honestly_not_as_a_false_success() {
+        let (handle, controller) = connected_handle_with_controller();
+        controller.set_unsupported(24, true);
+        let light = ReceiverLight {
+            mode: 0,
+            color: (0xff, 0, 0),
+            speed: 5,
+            brightness: 5,
+            time: 1,
+        };
+        let error = apply_receiver_light(&handle, light).unwrap_err();
+        assert!(matches!(
+            error,
+            AppError::Protocol(ProtocolError::Unsupported { command: 24 })
+        ));
+    }
+
+    #[test]
+    fn run_pairing_reports_progress_then_succeeds() {
+        let (handle, controller) = connected_handle_with_controller();
+        controller.set_pair_outcome(true, 2);
+        let mut updates = Vec::new();
+        let result =
+            run_pairing(&handle, Duration::ZERO, 20, |update| updates.push(update)).unwrap();
+        assert_eq!(result.state, PairPhaseDto::Succeeded);
+        assert_eq!(updates.first().unwrap().state, PairPhaseDto::Pairing);
+        assert_eq!(updates.last().unwrap().state, PairPhaseDto::Succeeded);
+    }
+
+    #[test]
+    fn run_pairing_reports_failure() {
+        let (handle, controller) = connected_handle_with_controller();
+        controller.set_pair_outcome(false, 1);
+        let result = run_pairing(&handle, Duration::ZERO, 20, |_| {}).unwrap();
+        assert_eq!(result.state, PairPhaseDto::Failed);
+    }
+
+    #[test]
+    fn run_pairing_forces_failure_once_max_polls_is_exhausted() {
+        let (handle, controller) = connected_handle_with_controller();
+        // Configured to resolve well past the poll budget this call allows.
+        controller.set_pair_outcome(true, 100);
+        let result = run_pairing(&handle, Duration::ZERO, 3, |_| {}).unwrap();
+        assert_eq!(result.state, PairPhaseDto::Failed);
+    }
+
+    #[test]
+    fn run_pairing_reports_unsupported_honestly_when_enter_pair_is_unsupported() {
+        let (handle, controller) = connected_handle_with_controller();
+        controller.set_unsupported(5, true);
+        let error = run_pairing(&handle, Duration::ZERO, 20, |_| {}).unwrap_err();
+        assert!(matches!(
+            error,
+            AppError::Protocol(ProtocolError::Unsupported { command: 5 })
+        ));
     }
 }

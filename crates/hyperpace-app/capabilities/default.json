@@ -11,6 +11,7 @@
     "allow-read-settings",
     "allow-write-setting",
     "allow-set-button",
+    "allow-get-button-keystroke",
     "allow-save-macro",
     "allow-list-macros",
     "allow-delete-macro",

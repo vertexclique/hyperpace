@@ -21,6 +21,12 @@ const IDLE_STEP: Duration = Duration::from_millis(5);
 /// State shared between a [`SimTransport`] moved into an owner thread and every [`SimController`]
 /// clone a test keeps. Guarded by a plain [`Mutex`]: this is test and development infrastructure,
 /// never a production hot path, so the lock is never contended enough to matter.
+// Four independent simulated device flags (online, long-range mode, whether the closed
+// simulation itself was closed, and how a pairing session configured by SimController resolves),
+// each mirroring a genuinely independent piece of the protocol's own state, not a design choice
+// a state machine would simplify (see the fixed-shape allow on `StatusChanged` for the same
+// reasoning).
+#[allow(clippy::struct_excessive_bools)]
 struct Inner {
     cid: u8,
     mid: u8,
@@ -35,10 +41,151 @@ struct Inner {
     unsupported: HashSet<u8>,
     pending_pushes: VecDeque<Frame>,
     closed: bool,
+    /// A pairing session begun by `DongleEnterPair` (5), advanced one tick per `GetPairState` (6)
+    /// poll, section 10.1. `None` when no session is in progress (idle).
+    pairing: Option<PairingSim>,
+    /// How many `GetPairState` polls a session takes to resolve, and whether it resolves to
+    /// success or failure; read fresh by every `DongleEnterPair`, so a test can reconfigure it
+    /// between pairing attempts. Defaults to succeeding on the third poll.
+    pair_resolve_ticks: u8,
+    pair_succeeds: bool,
+    /// The receiver's own indicator light (`SetDongleLight`/`GetDongleLight`, section 10.5),
+    /// stored so a `GetDongleLight` genuinely returns what a prior `SetDongleLight` set, rather
+    /// than a bare acknowledgement.
+    receiver_light: ReceiverLightSim,
+}
+
+/// One in-progress pairing session, section 10.1.
+#[derive(Clone, Copy)]
+struct PairingSim {
+    /// `GetPairState` polls answered so far this session.
+    ticks: u8,
+}
+
+/// The receiver light record `SetDongleLight`/`GetDongleLight` read and write, section 10.5.
+/// Defaults match the vendor UI's own defaults: mode 0, `#ff0000`, brightness 5, speed 5, time 1.
+#[derive(Clone, Copy)]
+struct ReceiverLightSim {
+    mode: u8,
+    color: (u8, u8, u8),
+    speed: u8,
+    brightness: u8,
+    time: u8,
+}
+
+impl Default for ReceiverLightSim {
+    fn default() -> Self {
+        Self {
+            mode: 0,
+            color: (0xff, 0, 0),
+            speed: 5,
+            brightness: 5,
+            time: 1,
+        }
+    }
 }
 
 fn lock(inner: &Mutex<Inner>) -> std::sync::MutexGuard<'_, Inner> {
     inner.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// `WriteFlashData` (7): copy `request`'s declared payload into simulated flash at its address.
+fn write_flash_sim(inner: &mut Inner, request: &Frame) -> Frame {
+    let address = usize::from(request.address);
+    let data = request.declared_payload();
+    if address < inner.flash.len() {
+        let end = (address + data.len()).min(inner.flash.len());
+        let written = end - address;
+        inner.flash[address..end].copy_from_slice(&data[..written]);
+    }
+    let mut reply = Frame::command(7);
+    reply.address = request.address;
+    reply.length = request.length;
+    reply
+}
+
+/// `ReadFlashData` (8): the requested span of simulated flash, `0xFF` past what was ever written.
+fn read_flash_sim(inner: &Inner, request: &Frame) -> Frame {
+    let address = usize::from(request.address);
+    let len = usize::from(request.length).min(PAYLOAD_LEN);
+    let mut reply = Frame::command(8);
+    reply.address = request.address;
+    reply.length = request.length;
+    if address < inner.flash.len() {
+        let end = (address + len).min(inner.flash.len());
+        let read = end - address;
+        reply.payload[..read].copy_from_slice(&inner.flash[address..end]);
+        reply.payload[read..len].fill(0xff);
+    } else {
+        reply.payload[..len].fill(0xff);
+    }
+    reply
+}
+
+/// `GetPairState` (6): one tick of the pairing session started by the most recent
+/// `DongleEnterPair`, section 10.1. `[0]` 1 pairing, 2 fail, 3 success (0 when no session is in
+/// progress, a value none of those three claims); `[1]` seconds left.
+fn pair_state_sim(inner: &mut Inner) -> Frame {
+    let mut reply = Frame::command(6);
+    reply.length = 2;
+    match inner.pairing {
+        None => {
+            reply.payload[0] = 0;
+            reply.payload[1] = 0;
+        }
+        Some(session) => {
+            let elapsed = session.ticks + 1;
+            let resolve_at = inner.pair_resolve_ticks;
+            if elapsed >= resolve_at {
+                reply.payload[0] = u8::from(inner.pair_succeeds) + 2; // 2 fail, 3 success
+                reply.payload[1] = 0;
+                inner.pairing = None;
+            } else {
+                reply.payload[0] = 1;
+                reply.payload[1] = resolve_at - elapsed;
+                inner.pairing = Some(PairingSim { ticks: elapsed });
+            }
+        }
+    }
+    reply
+}
+
+/// `ClearSetting` (9), a factory reset: the settings shadow, active profile, any in-progress
+/// pairing session and the receiver light all return to their defaults, section 10.3.
+fn factory_reset_sim(inner: &mut Inner) -> Frame {
+    inner.flash = vec![0xff; settings::SHADOW_LEN];
+    inner.profile = 0;
+    inner.pairing = None;
+    inner.receiver_light = ReceiverLightSim::default();
+    Frame::command(9)
+}
+
+/// `SetDongleLight` (24): stores the record so `GetDongleLight` genuinely returns what was set,
+/// section 10.5.
+fn set_receiver_light_sim(inner: &mut Inner, request: &Frame) -> Frame {
+    inner.receiver_light = ReceiverLightSim {
+        mode: request.payload[0],
+        color: (request.payload[1], request.payload[2], request.payload[3]),
+        speed: request.payload[4],
+        brightness: request.payload[5],
+        time: request.payload[6],
+    };
+    Frame::command(24)
+}
+
+/// `GetDongleLight` (25): the receiver light record a prior `SetDongleLight` stored, or this
+/// simulator's own defaults if none has run yet.
+fn receiver_light_sim(light: ReceiverLightSim) -> Frame {
+    let mut reply = Frame::command(25);
+    reply.payload[0] = light.mode;
+    reply.payload[1] = light.color.0;
+    reply.payload[2] = light.color.1;
+    reply.payload[3] = light.color.2;
+    reply.payload[4] = light.speed;
+    reply.payload[5] = light.brightness;
+    reply.payload[6] = light.time;
+    reply.length = 7;
+    reply
 }
 
 /// Compute the reply to one decoded request, per `docs/research/mouse-protocol-v2.md` section 5.
@@ -80,35 +227,8 @@ fn handle_request(inner: &mut Inner, request: &Frame) -> Frame {
             reply.length = 1;
             reply
         }
-        7 => {
-            let address = usize::from(request.address);
-            let data = request.declared_payload();
-            if address < inner.flash.len() {
-                let end = (address + data.len()).min(inner.flash.len());
-                let written = end - address;
-                inner.flash[address..end].copy_from_slice(&data[..written]);
-            }
-            let mut reply = Frame::command(7);
-            reply.address = request.address;
-            reply.length = request.length;
-            reply
-        }
-        8 => {
-            let address = usize::from(request.address);
-            let len = usize::from(request.length).min(PAYLOAD_LEN);
-            let mut reply = Frame::command(8);
-            reply.address = request.address;
-            reply.length = request.length;
-            if address < inner.flash.len() {
-                let end = (address + len).min(inner.flash.len());
-                let read = end - address;
-                reply.payload[..read].copy_from_slice(&inner.flash[address..end]);
-                reply.payload[read..len].fill(0xff);
-            } else {
-                reply.payload[..len].fill(0xff);
-            }
-            reply
-        }
+        7 => write_flash_sim(inner, request),
+        8 => read_flash_sim(inner, request),
         14 => {
             let mut reply = Frame::command(14);
             reply.payload[0] = inner.profile;
@@ -143,10 +263,16 @@ fn handle_request(inner: &mut Inner, request: &Frame) -> Frame {
             reply.length = 2;
             reply
         }
-        // EnterPair, GetPairState, FactoryReset, SetReceiverLight, GetReceiverLight: acknowledged
-        // with a bare status-0 echo. No test in this crate depends on their payload shape yet;
-        // add a case here (with a test) before one does.
-        5 | 6 | 9 | 24 | 25 => Frame::command(request.command),
+        5 => {
+            // DongleEnterPair: begin a fresh pairing session, section 10.1. Replaces any session
+            // already in progress, matching a real receiver's own re-entry into pairing mode.
+            inner.pairing = Some(PairingSim { ticks: 0 });
+            Frame::command(5)
+        }
+        6 => pair_state_sim(inner),
+        9 => factory_reset_sim(inner),
+        24 => set_receiver_light_sim(inner, request),
+        25 => receiver_light_sim(inner.receiver_light),
         other => {
             let mut reply = Frame::command(other);
             reply.status = 1;
@@ -182,6 +308,10 @@ impl SimTransport {
             unsupported: HashSet::new(),
             pending_pushes: VecDeque::new(),
             closed: false,
+            pairing: None,
+            pair_resolve_ticks: 3,
+            pair_succeeds: true,
+            receiver_light: ReceiverLightSim::default(),
         }));
         let transport = Self {
             inner: Arc::clone(&inner),
@@ -264,6 +394,16 @@ impl SimController {
     /// Set the value `ReadVersionID` reports.
     pub fn set_version(&self, major: u8, minor: u8) {
         lock(&self.inner).version = (major, minor);
+    }
+
+    /// Configure how a pairing session begun by `DongleEnterPair` resolves: after
+    /// `resolve_after_ticks` `GetPairState` polls (clamped to at least 1), it answers success when
+    /// `succeeds` is true, failure otherwise. Takes effect for the next `DongleEnterPair`, and
+    /// every one after that until changed again.
+    pub fn set_pair_outcome(&self, succeeds: bool, resolve_after_ticks: u8) {
+        let mut inner = lock(&self.inner);
+        inner.pair_succeeds = succeeds;
+        inner.pair_resolve_ticks = resolve_after_ticks.max(1);
     }
 
     /// Force a command to answer with status 1 (unsupported), or clear that.
@@ -421,6 +561,121 @@ mod tests {
         transport.send(&request.encode()).unwrap();
         let reply = Frame::decode(&transport.recv(Duration::ZERO).unwrap().unwrap()).unwrap();
         assert!(reply.payload.iter().all(|byte| *byte == 0xff));
+    }
+
+    #[test]
+    fn pairing_progresses_through_pairing_ticks_then_succeeds() {
+        let (mut transport, controller) = SimTransport::new(62, 1, 0);
+        controller.set_pair_outcome(true, 3);
+
+        transport.send(&Frame::command(5).encode()).unwrap(); // DongleEnterPair
+        transport.recv(Duration::ZERO).unwrap();
+
+        for expected_seconds_left in [2u8, 1] {
+            transport.send(&Frame::command(6).encode()).unwrap();
+            let reply = Frame::decode(&transport.recv(Duration::ZERO).unwrap().unwrap()).unwrap();
+            assert_eq!(reply.payload[0], 1, "still pairing");
+            assert_eq!(reply.payload[1], expected_seconds_left);
+        }
+
+        transport.send(&Frame::command(6).encode()).unwrap();
+        let reply = Frame::decode(&transport.recv(Duration::ZERO).unwrap().unwrap()).unwrap();
+        assert_eq!(reply.payload[0], 3, "succeeded on the configured tick");
+    }
+
+    #[test]
+    fn pairing_can_be_configured_to_fail() {
+        let (mut transport, controller) = SimTransport::new(62, 1, 0);
+        controller.set_pair_outcome(false, 1);
+
+        transport.send(&Frame::command(5).encode()).unwrap();
+        transport.recv(Duration::ZERO).unwrap();
+        transport.send(&Frame::command(6).encode()).unwrap();
+        let reply = Frame::decode(&transport.recv(Duration::ZERO).unwrap().unwrap()).unwrap();
+        assert_eq!(reply.payload[0], 2, "failed on the configured tick");
+    }
+
+    #[test]
+    fn get_pair_state_without_a_session_reports_idle_not_a_stale_phase() {
+        let (mut transport, _controller) = SimTransport::new(62, 1, 0);
+        transport.send(&Frame::command(6).encode()).unwrap();
+        let reply = Frame::decode(&transport.recv(Duration::ZERO).unwrap().unwrap()).unwrap();
+        assert_eq!(reply.payload[0], 0);
+    }
+
+    #[test]
+    fn factory_reset_erases_the_flash_and_the_active_profile() {
+        let (mut transport, _controller) = SimTransport::new(62, 1, 0);
+        transport
+            .send(&request::write_flash(20, &[1, 2, 3, 4]).unwrap().encode())
+            .unwrap();
+        transport.recv(Duration::ZERO).unwrap();
+        transport.send(&request::set_profile(2).encode()).unwrap();
+        transport.recv(Duration::ZERO).unwrap();
+
+        transport.send(&Frame::command(9).encode()).unwrap(); // ClearSetting
+        transport.recv(Duration::ZERO).unwrap();
+
+        transport
+            .send(&request::read_flash(20, 4).encode())
+            .unwrap();
+        let reply = Frame::decode(&transport.recv(Duration::ZERO).unwrap().unwrap()).unwrap();
+        assert_eq!(&reply.payload[..4], &[0xff; 4], "flash must be erased");
+
+        transport.send(&Frame::command(14).encode()).unwrap(); // GetCurrentConfig
+        let reply = Frame::decode(&transport.recv(Duration::ZERO).unwrap().unwrap()).unwrap();
+        assert_eq!(reply.payload[0], 0, "profile must return to its default");
+    }
+
+    #[test]
+    fn factory_reset_cancels_an_in_progress_pairing_session() {
+        let (mut transport, controller) = SimTransport::new(62, 1, 0);
+        controller.set_pair_outcome(true, 5);
+        transport.send(&Frame::command(5).encode()).unwrap(); // DongleEnterPair
+        transport.recv(Duration::ZERO).unwrap();
+
+        transport.send(&Frame::command(9).encode()).unwrap(); // ClearSetting
+        transport.recv(Duration::ZERO).unwrap();
+
+        transport.send(&Frame::command(6).encode()).unwrap();
+        let reply = Frame::decode(&transport.recv(Duration::ZERO).unwrap().unwrap()).unwrap();
+        assert_eq!(reply.payload[0], 0, "the session must not survive a reset");
+    }
+
+    #[test]
+    fn receiver_light_stores_and_returns_what_was_set() {
+        let (mut transport, _controller) = SimTransport::new(62, 1, 0);
+        let mut set = Frame::command(24);
+        set.length = 10;
+        set.payload[..7].copy_from_slice(&[2, 0x11, 0x22, 0x33, 7, 8, 9]);
+        transport.send(&set.encode()).unwrap();
+        transport.recv(Duration::ZERO).unwrap();
+
+        transport.send(&Frame::command(25).encode()).unwrap();
+        let reply = Frame::decode(&transport.recv(Duration::ZERO).unwrap().unwrap()).unwrap();
+        assert_eq!(&reply.payload[..7], &[2, 0x11, 0x22, 0x33, 7, 8, 9]);
+    }
+
+    #[test]
+    fn receiver_light_defaults_match_the_documented_values() {
+        let (mut transport, _controller) = SimTransport::new(62, 1, 0);
+        transport.send(&Frame::command(25).encode()).unwrap();
+        let reply = Frame::decode(&transport.recv(Duration::ZERO).unwrap().unwrap()).unwrap();
+        assert_eq!(&reply.payload[..7], &[0, 0xff, 0, 0, 5, 5, 1]);
+    }
+
+    #[test]
+    fn a_model_lacking_receiver_light_answers_unsupported_not_a_false_off() {
+        // Models the NEW driver's hardware, which "has no receiver-light commands" (section
+        // 10.5): forcing 24/25 unsupported, the same generic mechanism every other command in
+        // this simulator already honors, proves the honesty fence holds for this flow too.
+        let (mut transport, controller) = SimTransport::new(62, 1, 0);
+        controller.set_unsupported(24, true);
+        controller.set_unsupported(25, true);
+
+        transport.send(&Frame::command(25).encode()).unwrap();
+        let reply = Frame::decode(&transport.recv(Duration::ZERO).unwrap().unwrap()).unwrap();
+        assert_eq!(reply.status, 1);
     }
 
     proptest! {

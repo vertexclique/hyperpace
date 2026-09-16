@@ -93,17 +93,41 @@
 	}
 
 	let pairing = $state(false);
-	let pairingStarted = $state(false);
 
 	async function startPairing() {
 		pairing = true;
 		try {
 			await device.pairReceiver();
-			pairingStarted = true;
 		} finally {
 			pairing = false;
 		}
 	}
+
+	// device.pairState streams every GetPairState poll live (phase and seconds remaining), not
+	// just the outcome of the last pairReceiver() call (docs/research/mouse-protocol-v2.md
+	// section 10.1).
+	let receiverArtStatus = $derived.by((): 'idle' | 'pairing' | 'paired' => {
+		if (pairing) return 'pairing';
+		const phase = device.pairState?.state.phase;
+		if (phase === 'pairing') return 'pairing';
+		if (phase === 'succeeded') return 'paired';
+		return 'idle';
+	});
+
+	let pairingStatusText = $derived.by((): string | null => {
+		const state = device.pairState;
+		if (!state) return null;
+		switch (state.state.phase) {
+			case 'pairing':
+				return `Pairing... ${state.secondsLeft}s left`;
+			case 'succeeded':
+				return 'Paired';
+			case 'failed':
+				return 'Pairing failed';
+			case 'other':
+				return `Unexpected pairing state (${state.state.byte})`;
+		}
+	});
 
 	let confirmingReset = $state(false);
 
@@ -245,7 +269,7 @@
 		<div class="panel-title">Receiver</div>
 		<div class="panel-subtitle">The 2.4 GHz dongle: its light, pairing and a factory reset.</div>
 		<div class="receiver-layout">
-			<ReceiverArt status={pairing ? 'pairing' : pairingStarted ? 'paired' : 'idle'} />
+			<ReceiverArt status={receiverArtStatus} />
 			<div class="field-stack" style="flex:1">
 				<SelectField
 					label="Receiver light effect"
@@ -294,6 +318,9 @@
 				<div class="field-hint">
 					After starting, hold the left, right and wheel buttons together for 3 seconds.
 				</div>
+				{#if pairingStatusText}
+					<div class="field-hint">{pairingStatusText}</div>
+				{/if}
 			</div>
 			<button class="btn" disabled={pairing} onclick={startPairing}>
 				{pairing ? 'Starting...' : 'Start pairing'}

@@ -54,7 +54,7 @@ fn wire_close_to_tray(window: &WebviewWindow) {
         if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL)
             && let Err(error) = window.destroy()
         {
-            eprintln!("hyperpace: could not destroy the main window: {error}");
+            tracing::warn!(%error, "could not destroy the main window on close");
         }
     });
 }

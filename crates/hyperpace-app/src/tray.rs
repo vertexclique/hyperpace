@@ -80,11 +80,8 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(true)
         .on_menu_event(|app, event| match event.id().as_ref() {
             MENU_SHOW => {
-                // vertexia: eprintln, not structured logging; no logging crate is set up
-                // anywhere in this workspace yet, and adding one is a bigger call than one tray
-                // handler. Upgrade path: route through whichever crate the workspace adopts.
                 if let Err(error) = window::show_main_window(app) {
-                    eprintln!("hyperpace: could not show the main window: {error}");
+                    tracing::error!(%error, "could not show the main window from the tray menu");
                 }
             }
             MENU_QUIT => app.exit(0),
@@ -126,13 +123,13 @@ pub fn on_state_changed(app: &AppHandle, state: DeviceStateDto) {
             image.width,
             image.height,
         ))) {
-            eprintln!("hyperpace: could not update the tray icon: {error}");
+            tracing::warn!(%error, "could not update the tray icon");
         }
         if let Err(error) = handles
             .icon
             .set_tooltip(Some(tray_tooltip(percent, charging)))
         {
-            eprintln!("hyperpace: could not update the tray tooltip: {error}");
+            tracing::warn!(%error, "could not update the tray tooltip");
         }
     }
 
@@ -140,7 +137,7 @@ pub fn on_state_changed(app: &AppHandle, state: DeviceStateDto) {
         .battery_item
         .set_text(battery_menu_label(percent, state.connected))
     {
-        eprintln!("hyperpace: could not update the tray menu: {error}");
+        tracing::warn!(%error, "could not update the tray menu");
     }
 }
 
@@ -153,7 +150,7 @@ pub fn notify_low_battery(app: &AppHandle, percent: u8) {
         .body(format!("Battery at {percent}%. Charge the mouse soon."))
         .show();
     if let Err(error) = result {
-        eprintln!("hyperpace: could not show the low-battery notification: {error}");
+        tracing::warn!(%error, percent, "could not show the low-battery notification");
     }
 }
 

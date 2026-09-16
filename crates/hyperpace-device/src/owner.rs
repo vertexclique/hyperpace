@@ -273,6 +273,101 @@ fn write_block(
     Ok(())
 }
 
+/// Read `len` bytes starting at `address`, split into [`hyperpace_protocol::PAYLOAD_LEN`]-byte
+/// `ReadFlashData` requests (the read-side mirror of [`write_block`]). Stops at the first chunk
+/// that fails; bytes already read are still mirrored into `shadow` even though the error is what
+/// reaches the caller, matching `write_block`'s own "stops at the first chunk that fails" note.
+fn read_block(
+    transport: &mut dyn Transport,
+    subscribers: &mut Vec<mpsc::Sender<DeviceEvent>>,
+    shadow: &mut Shadow,
+    address: u16,
+    len: usize,
+) -> Result<Vec<u8>, DeviceError> {
+    let mut out = Vec::with_capacity(len);
+    let mut offset = 0usize;
+    while offset < len {
+        let chunk_len = (len - offset).min(hyperpace_protocol::PAYLOAD_LEN);
+        let chunk_offset = u16::try_from(offset).unwrap_or(u16::MAX);
+        let chunk_address = address.saturating_add(chunk_offset);
+        let chunk_len_byte = u8::try_from(chunk_len).unwrap_or(u8::MAX);
+        let frame = request::read_flash(chunk_address, chunk_len_byte);
+        let reply = send_and_await(
+            transport,
+            subscribers,
+            Command::ReadFlash as u8,
+            &frame,
+            WRITE_TIMEOUT,
+        )?;
+        let data = &reply.payload[..chunk_len];
+        shadow.apply_read(chunk_address, data);
+        out.extend_from_slice(data);
+        offset += chunk_len;
+    }
+    Ok(out)
+}
+
+/// Service an [`OwnerCommand::Request`]: send it, and when it was a `FactoryReset` (9) the device
+/// actually decoded (not status-1), discard the cached shadow and restart the base settings walk
+/// (protocol reference section 10.3: a factory reset is followed by a full flash re-read;
+/// `advance_walk` repopulates the shadow from the now-reset device on the next ticks).
+fn service_request(
+    transport: &mut dyn Transport,
+    state: &mut OwnerState,
+    frame: Frame,
+    timeout: Duration,
+    reply: &mpsc::Sender<Result<Frame, DeviceError>>,
+) -> Result<(), ServiceExit> {
+    if state.access == Access::ReadOnly && is_write_command(frame.command) {
+        let _ = reply.send(Err(DeviceError::ReadOnly));
+        return Ok(());
+    }
+    let command_byte = frame.command;
+    let result = send_and_await(
+        transport,
+        &mut state.subscribers,
+        command_byte,
+        &frame,
+        timeout,
+    );
+    if let Ok(reply_frame) = &result
+        && command_byte == Command::FactoryReset as u8
+        && reply_frame.status() != hyperpace_protocol::Status::Unsupported
+    {
+        state.shadow = Shadow::new();
+        state.phase = ConnectPhase::Walk { offset: 0 };
+    }
+    let disconnected = matches!(result, Err(DeviceError::Disconnected));
+    let _ = reply.send(result);
+    if disconnected {
+        return Err(ServiceExit::Disconnected);
+    }
+    Ok(())
+}
+
+/// Service an [`OwnerCommand::ReadBlock`].
+fn service_read_block(
+    transport: &mut dyn Transport,
+    state: &mut OwnerState,
+    address: u16,
+    len: usize,
+    reply: &mpsc::Sender<Result<Vec<u8>, DeviceError>>,
+) -> Result<(), ServiceExit> {
+    let result = read_block(
+        transport,
+        &mut state.subscribers,
+        &mut state.shadow,
+        address,
+        len,
+    );
+    let disconnected = matches!(result, Err(DeviceError::Disconnected));
+    let _ = reply.send(result);
+    if disconnected {
+        return Err(ServiceExit::Disconnected);
+    }
+    Ok(())
+}
+
 /// Service one queued command to completion. Returns [`ServiceExit::Disconnected`] once the
 /// transport that answered it (if any) reported the device unreachable, after the caller waiting
 /// on its reply channel has already been told.
@@ -291,28 +386,15 @@ fn handle_command(
             frame,
             timeout,
             reply,
-        } => {
-            if state.access == Access::ReadOnly && is_write_command(frame.command) {
-                let _ = reply.send(Err(DeviceError::ReadOnly));
-                return Ok(());
-            }
-            let command_byte = frame.command;
-            let result = send_and_await(
-                transport,
-                &mut state.subscribers,
-                command_byte,
-                &frame,
-                timeout,
-            );
-            let disconnected = matches!(result, Err(DeviceError::Disconnected));
-            let _ = reply.send(result);
-            if disconnected {
-                return Err(ServiceExit::Disconnected);
-            }
-        }
+        } => service_request(transport, state, frame, timeout, &reply)?,
         OwnerCommand::ReadSettings { reply } => {
             let _ = reply.send(Ok(state.shadow.clone()));
         }
+        OwnerCommand::ReadBlock {
+            address,
+            len,
+            reply,
+        } => service_read_block(transport, state, address, len, &reply)?,
         OwnerCommand::WriteScalar {
             address,
             value,
@@ -626,6 +708,133 @@ mod tests {
         let handle = spawn(Box::new(transport), Access::ReadOnly).unwrap();
         let reply = handle
             .request(Command::GetLongRange.request(), Duration::from_millis(500))
+            .unwrap();
+        assert_eq!(reply.status(), Status::Unsupported);
+    }
+
+    #[test]
+    fn read_block_reaches_flash_the_connect_walk_never_covers() {
+        // The keystroke region starts at offset 256 (`offset::KEYSTROKE`), past WALK_LEN's
+        // 256-byte span, so read_settings alone can never see it; a fresh slot reads as erased
+        // flash, and a write through it round-trips.
+        let (transport, _controller) = SimTransport::new(62, 1, 0);
+        let handle = spawn(Box::new(transport), Access::ReadWrite).unwrap();
+
+        let erased = handle.read_block(offset::KEYSTROKE, 32).unwrap();
+        assert_eq!(erased, vec![0xffu8; 32]);
+
+        handle
+            .write_block(offset::KEYSTROKE, &[6, 0x81, 4, 0, 0x41, 4, 0, 0xaa])
+            .unwrap();
+        let written = handle.read_block(offset::KEYSTROKE, 8).unwrap();
+        assert_eq!(written, vec![6, 0x81, 4, 0, 0x41, 4, 0, 0xaa]);
+
+        // The read is also mirrored into the shadow, so a later read_settings sees it too.
+        let shadow = handle.read_settings().unwrap();
+        assert_eq!(shadow.scalar(offset::KEYSTROKE), 6);
+    }
+
+    #[test]
+    fn factory_reset_through_the_device_layer_erases_and_re_walks_the_shadow() {
+        let (transport, _controller) = SimTransport::new(62, 1, 0);
+        let handle = spawn(Box::new(transport), Access::ReadWrite).unwrap();
+        handle.write_scalar(offset::DEBOUNCE, 8).unwrap();
+        assert_eq!(handle.read_settings().unwrap().scalar(offset::DEBOUNCE), 8);
+
+        handle
+            .request(Command::FactoryReset.request(), TEST_TIMEOUT)
+            .unwrap();
+
+        // The re-walk that repopulates the shadow from the now-reset device runs on the owner
+        // thread's own idle ticks; poll on a deadline rather than a fixed sleep.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let mut erased = false;
+        while Instant::now() < deadline {
+            if handle.read_settings().unwrap().scalar(offset::DEBOUNCE) == 0xff {
+                erased = true;
+                break;
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+        assert!(
+            erased,
+            "the shadow must read back erased after a reset re-walk"
+        );
+    }
+
+    #[test]
+    fn pairing_progresses_through_its_phases_to_success_via_the_device_layer() {
+        let (transport, controller) = SimTransport::new(62, 1, 0);
+        controller.set_pair_outcome(true, 2);
+        let handle = spawn(Box::new(transport), Access::ReadWrite).unwrap();
+
+        handle
+            .request(Command::EnterPair.request(), TEST_TIMEOUT)
+            .unwrap();
+        let first = response::pair_state(
+            &handle
+                .request(Command::PairState.request(), TEST_TIMEOUT)
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(first.state, hyperpace_protocol::PairPhase::Pairing);
+
+        let second = response::pair_state(
+            &handle
+                .request(Command::PairState.request(), TEST_TIMEOUT)
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(second.state, hyperpace_protocol::PairPhase::Succeeded);
+    }
+
+    #[test]
+    fn pairing_can_fail_via_the_device_layer() {
+        let (transport, controller) = SimTransport::new(62, 1, 0);
+        controller.set_pair_outcome(false, 1);
+        let handle = spawn(Box::new(transport), Access::ReadWrite).unwrap();
+
+        handle
+            .request(Command::EnterPair.request(), TEST_TIMEOUT)
+            .unwrap();
+        let outcome = response::pair_state(
+            &handle
+                .request(Command::PairState.request(), TEST_TIMEOUT)
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(outcome.state, hyperpace_protocol::PairPhase::Failed);
+    }
+
+    #[test]
+    fn receiver_light_round_trips_via_the_device_layer() {
+        let (transport, _controller) = SimTransport::new(62, 1, 0);
+        let handle = spawn(Box::new(transport), Access::ReadWrite).unwrap();
+        let light = hyperpace_protocol::ReceiverLight {
+            mode: 3,
+            color: (10, 20, 30),
+            speed: 4,
+            brightness: 6,
+            time: 2,
+        };
+        handle
+            .request(request::receiver_light(&light), TEST_TIMEOUT)
+            .unwrap();
+
+        let reply = handle
+            .request(Command::GetReceiverLight.request(), TEST_TIMEOUT)
+            .unwrap();
+        assert_eq!(&reply.payload[..7], &[3, 10, 20, 30, 4, 6, 2]);
+    }
+
+    #[test]
+    fn a_model_lacking_a_feature_reports_it_unsupported_via_the_device_layer() {
+        let (transport, controller) = SimTransport::new(62, 1, 0);
+        controller.set_unsupported(9, true); // this model has no factory reset
+        let handle = spawn(Box::new(transport), Access::ReadWrite).unwrap();
+
+        let reply = handle
+            .request(Command::FactoryReset.request(), TEST_TIMEOUT)
             .unwrap();
         assert_eq!(reply.status(), Status::Unsupported);
     }

@@ -3279,6 +3279,8 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-single-instance",
  "tauri-runtime-wry",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

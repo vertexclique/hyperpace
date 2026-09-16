@@ -192,16 +192,16 @@ starting each.
 | Phase 6 (receiver tools and config files) | done | receiver light, pairing, factory reset, .bin export and import |
 | Phase 7 (firmware) | done as machinery | container parser, identity gate, guards, flash state machine, import path; no genuine package exists, so it has never been exercised and rollback remains impossible |
 | Phase 8 (packaging) | done as configuration | dist/deb, rpm, appimage, arch, windows, macos plus the udev rule and README; no package has been built or installed |
-| Gate | green | fmt, clippy with warnings as errors, doc build, 255 tests, cargo-deny advisories, bans, licenses and sources |
+| Gate | green | fmt, clippy with warnings as errors, doc build, 303 tests, cargo-deny advisories, bans, licenses and sources, plus the frontend build and type check |
 
 Known gaps still open, recorded so none is dropped silently:
 
 | Gap | Why it matters | State |
 |---|---|---|
-| Keystroke chord editing on the Buttons screen | A button can be bound to a keystroke, but its content cannot be edited: the contract has no command to read or write the keystroke slot | to do |
-| Pairing progress and profile read-back | Pairing and profile changes are fire and forget; the interface shows the request, not the device's answer, because there is no get command or event for either | to do |
-| Structured logging | The doctrine requires structured logs with a counter per error path; today a few background failures (tray update, notification, window show) print to stderr | to do |
-| Simulator fidelity for pairing, factory reset and receiver light | The simulator acknowledges these with a bare success and models no state, so tests cannot prove the flows behave | to do |
+| Keystroke chord editing on the Buttons screen | A button can be bound to a keystroke, but its content cannot be edited: the contract has no command to read or write the keystroke slot | closed: `get_button_keystroke` reads it (backed by the new `DeviceHandle::read_block`), `set_button`'s existing `keystroke` field writes it, and the Buttons screen now has a modifier-plus-key chord editor and a working media-key binding |
+| Pairing progress and profile read-back | Pairing and profile changes are fire and forget; the interface shows the request, not the device's answer, because there is no get command or event for either | closed: `pair_receiver` streams every `GetPairState` poll through a progress channel (phase and seconds left, shown on the Lighting screen), and `read_settings` now queries `GetCurrentConfig` alongside the shadow, shown honestly on the Settings screen (including when the device marks it unsupported) |
+| Structured logging | The doctrine requires structured logs with a counter per error path; today a few background failures (tray update, notification, window show) print to stderr | closed: `tracing`/`tracing-subscriber` wired up in `hyperpace-app`, every background `eprintln!` replaced with a leveled `tracing` call (error/warn per the doctrine), only the logging-subsystem's own bootstrap-failure fallback still prints directly |
+| Simulator fidelity for pairing, factory reset and receiver light | The simulator acknowledges these with a bare success and models no state, so tests cannot prove the flows behave | closed: the simulator now models a real pairing state machine (progresses through phases, can be configured to fail), factory reset erases its flash and cancels any in-progress session, the receiver light stores and returns what was set, and the existing per-command unsupported override proves the honesty-fence path for a model lacking a feature; covered by new tests through the device layer in both `hyperpace-device` and `hyperpace-app` |
 | Device layer on real hardware | Compile-checked and simulator-tested only; never opened against a device | blocked by the operator's rule, by design |
 | macOS and Windows paths | Implemented per documentation, never executed on those systems | needs those machines |
 | Built packages | Packaging configuration exists under `dist/`; no package has been built or installed | to do |

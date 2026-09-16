@@ -169,7 +169,7 @@ fn notify_finding(app: &AppHandle, report: &WatchReport) {
         .body(body)
         .show();
     if let Err(error) = result {
-        eprintln!("hyperpace: could not show the firmware watch notification: {error}");
+        tracing::warn!(%error, "could not show the firmware watch notification");
     }
 }
 
@@ -194,9 +194,7 @@ pub fn spawn_periodic_check(app: AppHandle) {
                             }
                         }
                         Err(error) => {
-                            eprintln!(
-                                "hyperpace: firmware watch could not build its client: {error}"
-                            );
+                            tracing::warn!(%error, "firmware watch could not build its client");
                         }
                     }
                 }
@@ -204,7 +202,7 @@ pub fn spawn_periodic_check(app: AppHandle) {
             }
         });
     if let Err(error) = spawned {
-        eprintln!("hyperpace: could not start the firmware watch background thread: {error}");
+        tracing::error!(%error, "could not start the firmware watch background thread");
     }
 }
 

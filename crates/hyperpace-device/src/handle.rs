@@ -22,6 +22,12 @@ pub(crate) enum OwnerCommand {
     ReadSettings {
         reply: mpsc::Sender<Result<Shadow, DeviceError>>,
     },
+    /// Read `len` bytes starting at `address`, chunked by the owner thread.
+    ReadBlock {
+        address: u16,
+        len: usize,
+        reply: mpsc::Sender<Result<Vec<u8>, DeviceError>>,
+    },
     /// Write a scalar pair at `address`.
     WriteScalar {
         address: u16,
@@ -100,6 +106,36 @@ impl DeviceHandle {
         if self
             .commands
             .send(OwnerCommand::ReadSettings { reply })
+            .is_err()
+        {
+            return Err(DeviceError::Disconnected);
+        }
+        recv_reply(&rx)
+    }
+
+    /// Read `len` bytes starting at `address`, split into [`hyperpace_protocol::PAYLOAD_LEN`]-byte
+    /// `ReadFlashData` requests.
+    ///
+    /// Unlike [`DeviceHandle::read_settings`], this reaches flash offsets the connect walk never
+    /// covers (the keystroke and macro regions, `docs/research/mouse-protocol-v2.md` section 6.1
+    /// start at offset 256, past the walk's 256-byte span): a caller that needs one of those
+    /// addresses reads it directly instead of waiting for a wider walk that never happens. Every
+    /// byte read is also mirrored into the owner thread's shadow, so a later [`DeviceHandle::read_settings`]
+    /// reflects it too.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DeviceError::Timeout`] or [`DeviceError::Disconnected`] as documented on
+    /// [`DeviceError`]. Never refused under [`Access::ReadOnly`]: reading flash is not a write.
+    pub fn read_block(&self, address: u16, len: usize) -> Result<Vec<u8>, DeviceError> {
+        let (reply, rx) = mpsc::channel();
+        if self
+            .commands
+            .send(OwnerCommand::ReadBlock {
+                address,
+                len,
+                reply,
+            })
             .is_err()
         {
             return Err(DeviceError::Disconnected);

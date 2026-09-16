@@ -303,6 +303,21 @@ pub fn pair_state(frame: &Frame) -> Result<PairState, ProtocolError> {
     })
 }
 
+/// Decode a `GetCurrentConfig` (14) reply: the active profile index.
+///
+/// Section 10.2: byte 5 (payload byte 0) carries the active profile; a status-1 reply marks
+/// profile switching unsupported on this device, matching every other status-1-aware parser here
+/// rather than being silently read as profile 0 (the honesty fence).
+///
+/// # Errors
+///
+/// Returns [`ProtocolError::WrongCommand`] if `frame` did not answer command 14, and
+/// [`ProtocolError::Unsupported`] if the device marked profiles unsupported (status 1).
+pub fn profile(frame: &Frame) -> Result<u8, ProtocolError> {
+    expect_reply(frame, 14)?;
+    Ok(frame.payload[0])
+}
+
 /// Decode a `GetLongRangeMode` (23) reply: whether long range mode is on.
 ///
 /// Not part of the flash shadow (section 7.9): long range is a dedicated command pair, so this
@@ -433,6 +448,33 @@ mod tests {
     fn online_reads_the_flag_and_the_raw_address() {
         let frame = reply(3, 0, &[1, 0xaa, 0xbb, 0xcc]);
         assert_eq!(online(&frame).unwrap(), (true, [0xaa, 0xbb, 0xcc]));
+    }
+
+    #[test]
+    fn profile_reads_the_active_index() {
+        let frame = reply(14, 0, &[3]);
+        assert_eq!(profile(&frame), Ok(3));
+    }
+
+    #[test]
+    fn profile_reports_unsupported_status_not_a_silent_zero() {
+        let frame = reply(14, 1, &[0]);
+        assert_eq!(
+            profile(&frame),
+            Err(ProtocolError::Unsupported { command: 14 })
+        );
+    }
+
+    #[test]
+    fn profile_refuses_a_reply_to_the_wrong_command() {
+        let frame = reply(15, 0, &[0]);
+        assert_eq!(
+            profile(&frame),
+            Err(ProtocolError::WrongCommand {
+                expected: 14,
+                got: 15
+            })
+        );
     }
 
     #[test]
