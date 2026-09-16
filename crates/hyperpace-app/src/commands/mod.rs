@@ -6,6 +6,7 @@
 //! (`docs/architecture/api-contract.md`'s crate boundary table). See `src/command_list.rs` for the
 //! full command name list this module's functions must stay in sync with.
 
+pub mod data;
 pub mod device;
 pub mod firmware;
 pub mod firmware_watch;

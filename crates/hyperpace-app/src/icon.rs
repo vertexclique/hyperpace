@@ -1,10 +1,10 @@
-//! Renders the tray icon: the Hyperpace mark, with its mouse shell filled to the battery level.
+//! Renders the tray icon: the battery percentage in large figures on the Hyperpace mark.
 //!
-//! The mark is the logo's own geometry (`art/hyperpace.svg`): a dark void inside a chamfered
-//! frame, neon corner brackets at the top left and bottom right, and an angular mouse shell with a
-//! red head. Here the shell doubles as a gauge. It fills from the bottom to the charge level in a
-//! status colour and carries the percentage, so the icon reads as the product and as a battery
-//! meter at once.
+//! The mark is the logo's frame (`art/hyperpace.svg`): a dark void with its corners cut and neon
+//! corner brackets at the top left and bottom right. On it, the percentage fills as much of the
+//! icon as it can, in a status colour, because at tray size the figures are the only part anyone
+//! can read. An earlier version drew the logo's mouse shell as a gauge with the figures inside it;
+//! the operator could not read them at tray size, so the figures won.
 //!
 //! The shapes are redrawn as pixels from the logo's own coordinates rather than rasterized from the
 //! SVG: the grid, traces and glow turn to mush at tray size, and rasterizing would mean a renderer
@@ -16,8 +16,8 @@
 //! [`tauri::image::Image::new_owned`]; nothing here touches Tauri, a file or D-Bus, so it is fully
 //! unit-tested without a tray or a display.
 //!
-//! There is no system font dependency: the digits are a small hand-drawn 3x5 bitmap face, the least
-//! code that reads at tray size.
+//! There is no system font dependency: the digits are a small hand-drawn 3x5 bitmap face, scaled
+//! up, the least code that reads at tray size.
 //!
 //! Every pixel coordinate in this module is bounded by [`ICON_SIZE`] end to end, far under every
 //! integer and float type involved here, so the conversions the geometry needs are allowed at the
@@ -38,67 +38,41 @@ const LOGO_UNITS: f32 = 512.0;
 
 /// The logo's background void.
 const VOID: [u8; 4] = [5, 9, 20, 255];
-/// The logo's neon cyan: corner brackets and the shell outline.
+/// The logo's neon cyan: the corner brackets.
 const CYAN: [u8; 4] = [0, 240, 255, 255];
-/// The logo's red: the shell's head.
-const RED: [u8; 4] = [255, 0, 60, 255];
-/// The logo's shell fill, which here is the empty part of the gauge.
-const SHELL_EMPTY: [u8; 4] = [10, 21, 38, 255];
-/// The shell outline when there is no reading to show.
+/// The figures when there is no reading to show.
 const UNKNOWN_GREY: [u8; 4] = [120, 120, 120, 255];
 /// The charging bolt.
 const BOLT: [u8; 4] = [255, 214, 0, 255];
-/// Digit ink, drawn over a dark keyline so it reads on every fill colour.
-const INK: [u8; 4] = [255, 255, 255, 255];
 
 /// The chamfer the logo cuts from each corner of its frame.
 const FRAME_CUT: f32 = 40.0;
-/// The angular mouse shell, clockwise from its nose: the logo's own outline, enlarged by a fifth
-/// about the mark's centre so two digits fit inside it at tray size.
-const SHELL: [(f32, f32); 6] = [
-    (256.0, 43.0),
-    (368.8, 151.0),
-    (356.8, 415.0),
-    (256.0, 487.0),
-    (155.2, 415.0),
-    (143.2, 151.0),
-];
-/// The red head at the top of the shell, enlarged with it.
-const HEAD: [(f32, f32); 4] = [
-    (256.0, 88.6),
-    (313.6, 163.0),
-    (256.0, 206.2),
-    (198.4, 163.0),
-];
 /// The two neon corner brackets, as polylines.
 const BRACKETS: [[(f32, f32); 3]; 2] = [
     [(24.0, 150.0), (24.0, 64.0), (104.0, 24.0)],
     [(488.0, 362.0), (488.0, 448.0), (408.0, 488.0)],
 ];
-/// The charging bolt, in the frame's top right corner, clear of the shell.
+/// The charging bolt, small, in the frame's top right corner.
 const BOLT_SHAPE: [(f32, f32); 6] = [
-    (440.0, 40.0),
-    (384.0, 150.0),
-    (424.0, 150.0),
-    (404.0, 236.0),
-    (476.0, 112.0),
-    (434.0, 112.0),
+    (452.0, 30.0),
+    (410.0, 112.0),
+    (440.0, 112.0),
+    (424.0, 176.0),
+    (480.0, 84.0),
+    (448.0, 84.0),
 ];
-/// The vertical centre of the digits, in the lower half of the shell below its head.
-const DIGITS_CENTRE_Y: f32 = 333.0;
 
 /// Pixel scale of one font cell for a one or two digit reading (each glyph is drawn [`DIGIT_ROWS`]
-/// cells tall).
-const GLYPH_SCALE: u32 = 3;
-/// Pixel scale for a three digit reading, which is only ever "100": at [`GLYPH_SCALE`] three glyphs
-/// would overrun the shell's own width.
-const GLYPH_SCALE_NARROW: u32 = 2;
+/// cells tall): two glyphs at this scale span most of the icon's width.
+const GLYPH_SCALE: u32 = 8;
+/// Pixel scale for a three digit reading, which is only ever "100".
+const GLYPH_SCALE_NARROW: u32 = 5;
 /// Columns in one glyph cell.
 const DIGIT_COLS: u32 = 3;
 /// Rows in one glyph cell.
 const DIGIT_ROWS: u32 = 5;
 /// Gap, in pixels, between adjacent glyphs.
-const GLYPH_GAP: u32 = 1;
+const GLYPH_GAP: u32 = 4;
 
 /// One row of a glyph, as the low [`DIGIT_COLS`] bits, most significant bit leftmost.
 type GlyphRows = [u8; DIGIT_ROWS as usize];
@@ -130,13 +104,13 @@ pub struct TrayIconImage {
     pub height: u32,
 }
 
-/// The gauge colour a charge level fills the shell with: the logo's cyan, deepened so white digits
-/// read on it, when comfortable; amber when getting low; red at or below the low-battery threshold.
-fn fill_color(percent: u8) -> [u8; 4] {
+/// The colour the figures are drawn in for a charge level: the logo's cyan when comfortable, amber
+/// when getting low, red at or below the low-battery threshold. Bright enough to read on the void.
+fn figure_color(percent: u8) -> [u8; 4] {
     match percent {
-        0..=15 => [214, 40, 60, 255],
-        16..=40 => [214, 158, 34, 255],
-        _ => [0, 150, 172, 255],
+        0..=15 => [255, 72, 88, 255],
+        16..=40 => [255, 190, 50, 255],
+        _ => [0, 240, 255, 255],
     }
 }
 
@@ -225,42 +199,6 @@ fn stroke(canvas: &mut Canvas, points: &[(f32, f32)], thickness: i32, color: [u8
     }
 }
 
-/// Draw the shell as a gauge: the empty colour above the charge level, `fill` below it, and an
-/// outline `thickness` pixels deep, which is every inside pixel within that distance of the edge.
-fn draw_shell(
-    canvas: &mut Canvas,
-    percent: Option<u8>,
-    fill: [u8; 4],
-    outline: [u8; 4],
-    thickness: i32,
-) {
-    let size = canvas.size;
-    let scale = canvas.scale();
-    let top = SHELL[0].1 * scale;
-    let bottom = SHELL[3].1 * scale;
-    let level =
-        percent.map(|percent| bottom - (bottom - top) * f32::from(percent.min(100)) / 100.0);
-    let is_inside = |x: i32, y: i32| inside(&SHELL, scale, x as f32 + 0.5, y as f32 + 0.5);
-
-    for y in 0..size as i32 {
-        for x in 0..size as i32 {
-            if !is_inside(x, y) {
-                continue;
-            }
-            let on_edge = (-thickness..=thickness)
-                .any(|dy| (-thickness..=thickness).any(|dx| !is_inside(x + dx, y + dy)));
-            let color = if on_edge {
-                outline
-            } else if level.is_some_and(|level| y as f32 + 0.5 >= level) {
-                fill
-            } else {
-                SHELL_EMPTY
-            };
-            canvas.set(x, y, color);
-        }
-    }
-}
-
 /// Fill a polygon (logo units) with `color`.
 fn fill_polygon(canvas: &mut Canvas, polygon: &[(f32, f32)], color: [u8; 4]) {
     let size = canvas.size;
@@ -274,29 +212,20 @@ fn fill_polygon(canvas: &mut Canvas, polygon: &[(f32, f32)], color: [u8; 4]) {
     }
 }
 
-/// Draw one glyph with its top-left cell at (`x0`, `y0`), each cell expanded to `scale` pixels,
-/// with a one-pixel dark keyline around the ink so it stays legible on any fill.
-fn draw_glyph(canvas: &mut Canvas, x0: i32, y0: i32, glyph: GlyphRows, scale: u32) {
+/// Draw one glyph with its top-left cell at (`x0`, `y0`), each cell expanded to `scale` pixels.
+fn draw_glyph(canvas: &mut Canvas, x0: i32, y0: i32, glyph: GlyphRows, scale: u32, color: [u8; 4]) {
     let scale = scale as i32;
-    let mut cells = Vec::new();
     for (row, bits) in glyph.iter().enumerate() {
         for col in 0..DIGIT_COLS {
-            if bits & (1 << (DIGIT_COLS - 1 - col)) != 0 {
-                cells.push((x0 + col as i32 * scale, y0 + row as i32 * scale));
+            if bits & (1 << (DIGIT_COLS - 1 - col)) == 0 {
+                continue;
             }
-        }
-    }
-    for &(cx, cy) in &cells {
-        for dy in -1..=scale {
-            for dx in -1..=scale {
-                canvas.set(cx + dx, cy + dy, VOID);
-            }
-        }
-    }
-    for &(cx, cy) in &cells {
-        for dy in 0..scale {
-            for dx in 0..scale {
-                canvas.set(cx + dx, cy + dy, INK);
+            let cx = x0 + col as i32 * scale;
+            let cy = y0 + row as i32 * scale;
+            for dy in 0..scale {
+                for dx in 0..scale {
+                    canvas.set(cx + dx, cy + dy, color);
+                }
             }
         }
     }
@@ -353,28 +282,29 @@ pub fn render_battery_icon(percent: Option<u8>, charging: bool) -> TrayIconImage
         stroke(&mut canvas, bracket, pen, CYAN);
     }
 
-    let (fill, outline) = match percent {
-        Some(percent) => (fill_color(percent), CYAN),
-        None => (SHELL_EMPTY, UNKNOWN_GREY),
-    };
-    draw_shell(&mut canvas, percent, fill, outline, pen - 1);
-    fill_polygon(&mut canvas, &HEAD, RED);
-
-    let glyphs: Vec<usize> = match percent {
-        Some(percent) => digits_of(percent),
-        None => vec![DASH_INDEX],
+    let (glyphs, color): (Vec<usize>, [u8; 4]) = match percent {
+        Some(percent) => (digits_of(percent), figure_color(percent)),
+        None => (vec![DASH_INDEX], UNKNOWN_GREY),
     };
     let scale = glyph_scale(glyphs.len());
     let start_x = (size as i32 - digits_width(glyphs.len()) as i32) / 2;
-    let centre_y = (DIGITS_CENTRE_Y * canvas.scale()) as i32;
-    let start_y = centre_y - (DIGIT_ROWS * scale) as i32 / 2;
+    let start_y = (size as i32 - (DIGIT_ROWS * scale) as i32) / 2;
     let advance = (DIGIT_COLS * scale + GLYPH_GAP) as i32;
     for (index, &digit) in glyphs.iter().enumerate() {
         let x = start_x + index as i32 * advance;
-        draw_glyph(&mut canvas, x, start_y, DIGIT_FONT[digit], scale);
+        draw_glyph(&mut canvas, x, start_y, DIGIT_FONT[digit], scale, color);
     }
 
     if charging {
+        // A one pixel void keyline first, so the bolt stays distinct where it meets a figure.
+        let unit = LOGO_UNITS / size as f32;
+        for (dx, dy) in [(-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0)] {
+            let shifted: Vec<(f32, f32)> = BOLT_SHAPE
+                .iter()
+                .map(|&(x, y)| (x + dx * unit, y + dy * unit))
+                .collect();
+            fill_polygon(&mut canvas, &shifted, VOID);
+        }
         fill_polygon(&mut canvas, &BOLT_SHAPE, BOLT);
     }
 
@@ -399,10 +329,14 @@ mod tests {
         ]
     }
 
-    /// A pixel near the bottom of the shell, inside its outline and below the digits: filled for
-    /// any charge above a few percent.
-    fn low_in_shell(image: &TrayIconImage) -> [u8; 4] {
-        pixel_at(image, ICON_SIZE / 2, ICON_SIZE * 56 / 64)
+    fn count(image: &TrayIconImage, color: [u8; 4]) -> usize {
+        image
+            .rgba
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .filter(|pixel| **pixel == color)
+            .count()
     }
 
     #[test]
@@ -430,44 +364,38 @@ mod tests {
     }
 
     #[test]
-    fn the_corner_brackets_are_drawn_in_the_logo_cyan() {
+    fn the_background_is_the_logo_void() {
         let image = render_battery_icon(Some(50), false);
-        // On the top left bracket's vertical run, well inside the frame.
-        assert_eq!(pixel_at(&image, 2, ICON_SIZE * 13 / 64), CYAN);
+        assert_eq!(pixel_at(&image, ICON_SIZE / 2, 3), VOID);
     }
 
     #[test]
-    fn the_shell_fills_further_the_more_charge_there_is() {
-        let filled = |image: &TrayIconImage, color: [u8; 4]| {
-            image
-                .rgba
-                .as_chunks::<4>()
-                .0
-                .iter()
-                .filter(|pixel| **pixel == color)
-                .count()
-        };
-        let high = render_battery_icon(Some(95), false);
-        let mid = render_battery_icon(Some(45), false);
-        assert!(filled(&high, fill_color(95)) > filled(&mid, fill_color(45)));
+    fn the_figures_are_large_enough_to_read_at_tray_size() {
+        // Two digits at this scale are 40 pixels tall on a 64 pixel icon: most of its height.
+        assert_eq!(DIGIT_ROWS * GLYPH_SCALE, 40);
+        assert!(digits_width(2) >= ICON_SIZE * 3 / 4);
+        assert!(digits_width(3) < ICON_SIZE);
     }
 
     #[test]
-    fn a_comfortable_charge_fills_cyan_and_a_low_one_fills_red() {
-        assert_eq!(
-            low_in_shell(&render_battery_icon(Some(90), false)),
-            fill_color(90)
-        );
-        assert_eq!(
-            low_in_shell(&render_battery_icon(Some(12), false)),
-            [214, 40, 60, 255]
-        );
+    fn the_figures_carry_the_charge_colour() {
+        assert!(count(&render_battery_icon(Some(90), false), figure_color(90)) > 200);
+        assert!(count(&render_battery_icon(Some(30), false), figure_color(30)) > 200);
+        assert!(count(&render_battery_icon(Some(8), false), figure_color(8)) > 100);
+        assert_ne!(figure_color(90), figure_color(30));
+        assert_ne!(figure_color(30), figure_color(8));
     }
 
     #[test]
-    fn no_reading_leaves_the_shell_empty_rather_than_implying_a_level() {
+    fn no_reading_shows_a_grey_dash_rather_than_a_number() {
         let image = render_battery_icon(None, false);
-        assert_eq!(low_in_shell(&image), SHELL_EMPTY);
+        assert!(count(&image, UNKNOWN_GREY) > 0);
+        // The comfortable-charge colour is the brackets' cyan, so with no figures drawn in it the
+        // icon holds exactly as much cyan as one whose figures are red.
+        assert_eq!(
+            count(&image, CYAN),
+            count(&render_battery_icon(Some(8), false), CYAN)
+        );
     }
 
     #[test]
@@ -475,12 +403,6 @@ mod tests {
         let charging = render_battery_icon(Some(50), true);
         let idle = render_battery_icon(Some(50), false);
         assert_ne!(charging.rgba, idle.rgba);
-    }
-
-    #[test]
-    fn one_hundred_percent_renders_without_clamping_below_it() {
-        let image = render_battery_icon(Some(100), false);
-        assert_eq!(image.rgba.len(), (ICON_SIZE * ICON_SIZE * 4) as usize);
     }
 
     #[test]

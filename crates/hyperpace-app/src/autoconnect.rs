@@ -97,6 +97,13 @@ fn try_connect(app: &AppHandle) {
     if state.is_connected() {
         return;
     }
+    if crate::dev::simulator_mode() {
+        match state.connect(false, ACCESS) {
+            Ok(_) => tracing::info!("development mode: connected to the simulator"),
+            Err(error) => tracing::error!(%error, "development mode: the simulator did not start"),
+        }
+        return;
+    }
     match state.connect(true, ACCESS) {
         Ok(_) => tracing::info!("connected to the mouse"),
         // `Disconnected` means nothing matching is attached, which is the normal state of an app

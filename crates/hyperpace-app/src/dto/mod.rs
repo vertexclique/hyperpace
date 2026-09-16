@@ -7,16 +7,20 @@
 //! wire bytes anywhere but in those crates.
 
 mod app_settings;
+mod data;
 mod device;
 mod firmware;
 mod macros;
 mod settings;
 
 pub use app_settings::{AppSettingsRequest, AppSettingsResponse};
+pub use data::{
+    DataOverviewDto, EventRecordDto, ImportStoreResponse, ListEventsResponse, ProfileSnapshotDto,
+};
 pub use device::{
     AccessDto, BatteryDto, ConnectRequest, DeviceBackendDto, DeviceDescriptor, DeviceEventPayload,
-    DeviceIdentityDto, DeviceStateDto, LinkTypeDto, PairPhaseDto, PairStateDto, ReceiverLightDto,
-    ReceiverLightStateDto, StatusChangedDto,
+    DeviceIdentityDto, DeviceStateDto, LinkTypeDto, ModelCapabilitiesDto, PairPhaseDto,
+    PairStateDto, ReceiverLightDto, ReceiverLightStateDto, StatusChangedDto,
 };
 pub use firmware::{
     FirmwareProgressPayload, FirmwareRecordDto, FirmwareWatchConfigDto, FirmwareWatchDirectoryDto,

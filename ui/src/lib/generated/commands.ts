@@ -31,7 +31,19 @@ export const COMMAND_NAMES = [
 	'firmware_install',
 	'firmware_check_for_updates',
 	'firmware_watch_check',
-	'app_settings'
+	'app_settings',
+	'data_overview',
+	'list_events',
+	'clear_events',
+	'list_profile_snapshots',
+	'save_profile_snapshot',
+	'restore_profile_snapshot',
+	'rename_profile_snapshot',
+	'delete_profile_snapshot',
+	'firmware_delete',
+	'reset_app_setting',
+	'export_store',
+	'import_store'
 ] as const;
 
 export type CommandName = (typeof COMMAND_NAMES)[number];

@@ -49,8 +49,6 @@ enum Presence {
 struct Link {
     /// Whether this is a wired link.
     wired: bool,
-    /// The polling ceiling this link type allows.
-    max_polling_hz: u16,
 }
 
 /// Everything the tray displays about the device, derived once from a [`DeviceStateDto`] so the
@@ -77,7 +75,6 @@ impl From<DeviceStateDto> for TrayStatus {
             },
             link: state.identity.map(|identity| Link {
                 wired: identity.wired,
-                max_polling_hz: identity.max_polling_hz,
             }),
             percent: state.battery.map(|battery| battery.percent),
             charging: state.battery.is_some_and(|battery| battery.charging),
@@ -97,13 +94,11 @@ impl TrayStatus {
         match (self.presence, self.link) {
             (Presence::Missing, _) => "No mouse found".to_owned(),
             (Presence::Asleep, _) => "Mouse asleep".to_owned(),
+            // The link, not its polling ceiling: "up to 8000 Hz" reads as the rate the mouse is set
+            // to, and the tray has no way to know the rate the operator actually chose.
             (Presence::Awake, None) => "Connected".to_owned(),
-            (Presence::Awake, Some(link)) if link.wired => {
-                format!("Connected, wired, up to {} Hz", link.max_polling_hz)
-            }
-            (Presence::Awake, Some(link)) => {
-                format!("Connected, 2.4 GHz, up to {} Hz", link.max_polling_hz)
-            }
+            (Presence::Awake, Some(link)) if link.wired => "Connected by cable".to_owned(),
+            (Presence::Awake, Some(_)) => "Connected over 2.4 GHz".to_owned(),
         }
     }
 
@@ -275,6 +270,7 @@ mod tests {
             link: LinkTypeDto::Wireless2k,
             max_polling_hz: 2000,
             wired: false,
+            capabilities: None,
         }
     }
 
@@ -309,7 +305,7 @@ mod tests {
         dto.identity = Some(wireless_identity());
         assert_eq!(
             TrayStatus::from(dto).status_line(),
-            "Connected, 2.4 GHz, up to 2000 Hz"
+            "Connected over 2.4 GHz"
         );
 
         let mut wired = state(true, true);
@@ -319,10 +315,7 @@ mod tests {
             wired: true,
             ..wireless_identity()
         });
-        assert_eq!(
-            TrayStatus::from(wired).status_line(),
-            "Connected, wired, up to 8000 Hz"
-        );
+        assert_eq!(TrayStatus::from(wired).status_line(), "Connected by cable");
     }
 
     #[test]

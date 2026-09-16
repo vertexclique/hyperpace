@@ -3279,6 +3279,7 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-single-instance",
  "tauri-runtime-wry",
+ "tempfile",
  "tracing",
  "tracing-subscriber",
 ]

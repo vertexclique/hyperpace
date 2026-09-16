@@ -28,6 +28,43 @@ use crate::dto::{
 use crate::error::{AppError, to_command_result};
 use crate::state::{AppState, REQUEST_TIMEOUT};
 
+/// Read the connected device's full settings shadow and encode it as `.bin` config file bytes.
+/// The shared core of [`export_config`] and `commands::data::save_profile_snapshot`, so a saved
+/// profile snapshot's stored bytes and a manual export are always produced exactly the same way,
+/// never two copies of this logic that could drift.
+///
+/// # Errors
+///
+/// Returns [`AppError::NotConnected`] when no device is connected, [`AppError::UnknownModel`]
+/// when its model is unrecognized, and otherwise whatever [`hyperpace_device::DeviceError`] the
+/// read reports.
+pub(crate) fn export_config_bytes(state: &AppState) -> Result<Vec<u8>, AppError> {
+    let (handle, table, identity, ..) = state.connected_model()?;
+    let shadow = handle.read_settings()?;
+    Ok(config_file::export(&shadow, &identity, table.sensor))
+}
+
+/// Decode `bytes` as a `.bin` config file for the connected device and write its (clamp-fixed)
+/// shadow to it. The shared core of [`import_config`] and
+/// `commands::data::restore_profile_snapshot`, so restoring a saved snapshot writes settings back
+/// through exactly the same path a manual import does.
+///
+/// # Errors
+///
+/// Returns [`AppError::NotConnected`] when no device is connected, [`AppError::Config`] when
+/// `bytes` is not a valid config file for the connected model, and otherwise whatever
+/// [`hyperpace_device::DeviceError`] the write reports.
+pub(crate) fn import_config_bytes(state: &AppState, bytes: &[u8]) -> Result<(), AppError> {
+    let (handle, table, ..) = state.connected_model()?;
+    let imported = config_file::import(bytes, table)?;
+    let last_address = u16::try_from(SHADOW_LEN).unwrap_or(u16::MAX);
+    let raw: Vec<u8> = (0..last_address)
+        .map(|addr| imported.shadow.scalar(addr))
+        .collect();
+    handle.write_block(0, &raw)?;
+    Ok(())
+}
+
 /// How often [`pair_receiver`] polls `GetPairState` once a pairing session has started, matching
 /// the vendor driver's own cadence (`docs/research/mouse-protocol-v2.md` section 10.1: "1 s
 /// poll").
@@ -204,7 +241,7 @@ fn query_long_range(handle: &DeviceHandle) -> Result<LongRangeDto, AppError> {
 /// # Errors
 ///
 /// Returns [`AppError::Device`] when the request itself could not complete.
-fn query_profile(handle: &DeviceHandle) -> Result<ProfileDto, AppError> {
+pub(crate) fn query_profile(handle: &DeviceHandle) -> Result<ProfileDto, AppError> {
     let reply = handle.request(Command::GetProfile.request(), REQUEST_TIMEOUT)?;
     match response::profile(&reply) {
         Ok(index) => Ok(ProfileDto::Active { index }),
@@ -451,9 +488,7 @@ pub async fn export_config(app: AppHandle) -> Result<Vec<u8>, String> {
     to_command_result(
         blocking(move || {
             let state = app.state::<AppState>();
-            let (handle, table, identity, ..) = state.connected_model()?;
-            let shadow = handle.read_settings()?;
-            Ok(config_file::export(&shadow, &identity, table.sensor))
+            export_config_bytes(&state)
         })
         .await,
     )
@@ -470,14 +505,7 @@ pub async fn import_config(app: AppHandle, bytes: Vec<u8>) -> Result<(), String>
     to_command_result(
         blocking(move || {
             let state = app.state::<AppState>();
-            let (handle, table, ..) = state.connected_model()?;
-            let imported = config_file::import(&bytes, table)?;
-            let last_address = u16::try_from(SHADOW_LEN).unwrap_or(u16::MAX);
-            let raw: Vec<u8> = (0..last_address)
-                .map(|addr| imported.shadow.scalar(addr))
-                .collect();
-            handle.write_block(0, &raw)?;
-            Ok(())
+            import_config_bytes(&state, &bytes)
         })
         .await,
     )

@@ -25,6 +25,8 @@
 //! - [`icon`]: renders the battery percentage into the tray icon's own pixels.
 //! - [`tray`]: builds the tray icon and its menu, and updates them as the device state changes.
 //! - [`window`]: the main window's lifecycle, including hide-to-tray with the webview destroyed.
+//! - [`dev`]: development mode, the simulator loaded with a real device's settings, running beside
+//!   an ordinary instance.
 //! - [`desktop_entry`]: on Linux, a per-user desktop entry and icon for a binary no package
 //!   installed, so the window shows the Hyperpace mark.
 //! - [`gpu_workaround`]: the Linux WebKitGTK/NVIDIA DMABUF blank-window workaround, applied before
@@ -35,6 +37,7 @@ pub mod autoconnect;
 pub mod blocking;
 pub mod commands;
 pub mod desktop_entry;
+pub mod dev;
 pub mod dto;
 pub mod error;
 pub mod gpu_workaround;
@@ -88,7 +91,10 @@ pub fn run() -> Result<(), AppError> {
     // `std::env::set_var`, is how it changes this process's environment. The closure defers that
     // read until `gpu_workaround::apply` actually needs it (most startups never do: the
     // environment variable or an already-set `WEBKIT_DISABLE_DMABUF_RENDERER` settles it first).
-    let store_root = Store::default_root()?;
+    let store_root = match dev::store_root_override() {
+        Some(root) => root,
+        None => Store::default_root()?,
+    };
     gpu_workaround::apply(|| read_gpu_workaround_setting(&store_root));
 
     // `commands::firmware_watch`'s HTTP client depends on reqwest's "rustls-no-provider" feature
@@ -100,17 +106,22 @@ pub fn run() -> Result<(), AppError> {
 
     let store = Store::open(&store_root)?;
 
-    let app = tauri::Builder::default()
-        .runtime(tauri_runtime_wry::Wry::default())
+    let builder = tauri::Builder::default().runtime(tauri_runtime_wry::Wry::default());
+    // Development mode runs beside an ordinary instance on purpose, so it skips the guard.
+    let builder = if dev::simulator_mode() {
+        builder
+    } else {
         // Must be the first plugin registered: plugins run in registration order, and this one
         // needs to intercept a second launch before anything else initializes
         // (tauri-plugin-single-instance's own README).
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             // A second launch focuses the existing window instead of starting a second instance.
             if let Err(error) = window::show_main_window(app) {
                 tracing::error!(%error, "could not show the main window for a second launch");
             }
         }))
+    };
+    let app = builder
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -141,11 +152,25 @@ pub fn run() -> Result<(), AppError> {
             commands::firmware::firmware_check_for_updates,
             commands::firmware_watch::firmware_watch_check,
             commands::settings::app_settings,
+            commands::data::data_overview,
+            commands::data::list_events,
+            commands::data::clear_events,
+            commands::data::list_profile_snapshots,
+            commands::data::save_profile_snapshot,
+            commands::data::restore_profile_snapshot,
+            commands::data::rename_profile_snapshot,
+            commands::data::delete_profile_snapshot,
+            commands::data::firmware_delete,
+            commands::data::reset_app_setting,
+            commands::data::export_store,
+            commands::data::import_store,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
             app.manage(AppState::new(store, store_root, handle.clone()));
-            desktop_entry::ensure_installed();
+            if !dev::simulator_mode() {
+                desktop_entry::ensure_installed();
+            }
             tray::build(&handle)?;
             window::show_main_window(&handle)?;
             autoconnect::spawn(handle.clone());

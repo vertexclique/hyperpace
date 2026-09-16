@@ -27,6 +27,18 @@
     "allow-firmware-install",
     "allow-firmware-check-for-updates",
     "allow-firmware-watch-check",
-    "allow-app-settings"
+    "allow-app-settings",
+    "allow-data-overview",
+    "allow-list-events",
+    "allow-clear-events",
+    "allow-list-profile-snapshots",
+    "allow-save-profile-snapshot",
+    "allow-restore-profile-snapshot",
+    "allow-rename-profile-snapshot",
+    "allow-delete-profile-snapshot",
+    "allow-firmware-delete",
+    "allow-reset-app-setting",
+    "allow-export-store",
+    "allow-import-store"
   ]
 }

@@ -63,6 +63,12 @@ pub enum AppError {
     Io(std::io::Error),
     /// The Tauri runtime reported an error building or driving a window, tray or channel.
     Tauri(tauri::Error),
+    /// Something the Data screen reads or writes (a profile snapshot's stored configuration, an
+    /// imported backup file, a firmware entry's package path) did not have the shape this crate
+    /// expects, or named a path that would resolve outside the local store. The string is
+    /// already the full plain sentence a caller shows as-is (the honesty fence in `AGENTS.md`);
+    /// the real cause, when there is one worth keeping, is logged separately.
+    InvalidData(String),
 }
 
 impl fmt::Display for AppError {
@@ -100,6 +106,7 @@ impl fmt::Display for AppError {
             Self::Store(error) => write!(f, "{error}"),
             Self::Io(error) => write!(f, "local file error: {error}"),
             Self::Tauri(error) => write!(f, "{error}"),
+            Self::InvalidData(reason) => write!(f, "{reason}"),
         }
     }
 }
@@ -195,6 +202,7 @@ mod tests {
             AppError::FirmwareReconnectTimeout,
             AppError::FirmwareWatchDisabled,
             AppError::Device(DeviceError::Disconnected),
+            AppError::InvalidData("that file is not a valid Hyperpace backup".to_owned()),
         ];
         for variant in variants {
             assert!(!variant.to_string().is_empty());

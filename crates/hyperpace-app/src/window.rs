@@ -39,7 +39,8 @@ pub fn show_main_window(app: &AppHandle) -> tauri::Result<()> {
     // region rather than clipping it (`.content`'s `overflow-y: auto`).
     let window =
         WebviewWindowBuilder::new(app, MAIN_WINDOW_LABEL, WebviewUrl::App("index.html".into()))
-            .title("Hyperpace")
+            .title(crate::dev::window_title())
+            .initialization_script(crate::dev::start_screen_script())
             .inner_size(1180.0, 940.0)
             .min_inner_size(900.0, 620.0)
             .build()?;

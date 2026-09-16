@@ -48,8 +48,21 @@ fn is_wired(link: LinkType) -> bool {
     matches!(link, LinkType::Wired1k | LinkType::Wired8k)
 }
 
+/// What the connected model physically has, so a screen shows only controls for hardware that
+/// exists. Mirrors the capability fields of [`hyperpace_protocol::ModelTable`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelCapabilitiesDto {
+    /// Whether the mouse body has its own light strip.
+    pub body_lighting: bool,
+    /// Whether the model has a DPI indicator light with its own effect.
+    pub dpi_indicator: bool,
+    /// Whether the model supports long range mode.
+    pub long_range: bool,
+}
+
 /// Mirrors [`DeviceIdentity`], plus [`LinkType::max_polling_hz`] computed once so the UI never
-/// has to re-derive it.
+/// has to re-derive it, and the model's capabilities.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceIdentityDto {
@@ -63,6 +76,8 @@ pub struct DeviceIdentityDto {
     pub max_polling_hz: u16,
     /// Whether `link` is a wired connection.
     pub wired: bool,
+    /// What this model physically has, or `None` for a cid/mid pair no known model table lists.
+    pub capabilities: Option<ModelCapabilitiesDto>,
 }
 
 impl From<DeviceIdentity> for DeviceIdentityDto {
@@ -73,6 +88,13 @@ impl From<DeviceIdentity> for DeviceIdentityDto {
             link: identity.link.into(),
             max_polling_hz: identity.link.max_polling_hz(),
             wired: is_wired(identity.link),
+            capabilities: hyperpace_protocol::table_for(identity.cid, identity.mid).map(|table| {
+                ModelCapabilitiesDto {
+                    body_lighting: table.body_lighting,
+                    dpi_indicator: table.dpi_indicator,
+                    long_range: table.long_range,
+                }
+            }),
         }
     }
 }

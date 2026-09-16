@@ -17,7 +17,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use hyperpace_device::{Access, DeviceEvent, DeviceHandle, HidTransport, SimTransport};
 use hyperpace_protocol::{Battery, DeviceIdentity, ModelTable, Transport, table_for};
-use hyperpace_store::{EventRecord, Store};
+use hyperpace_store::{EventRecord, Store, StoreError};
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager};
 
@@ -40,6 +40,14 @@ pub const REQUEST_TIMEOUT: Duration = Duration::from_millis(1500);
 pub const DEFAULT_LOW_BATTERY_THRESHOLD: u8 = 15;
 /// Key [`crate::commands::settings::app_settings`] stores the threshold under.
 pub const LOW_BATTERY_THRESHOLD_KEY: &str = "low_battery_threshold_percent";
+
+/// Hard cap on the device event log ([`EventRecord`]), enforced by [`AppState::record_event`]
+/// every time it appends one (`commands::data::list_events` reads this same log; see its own
+/// module docs for the Data screen that browses it). Bounds the resource that actually fails
+/// (the store's on-disk size and every `list()` this crate does against the collection), not a
+/// proxy for it: an unbounded log is exactly the "counting is not bounding" mistake the doctrine
+/// warns about.
+const EVENT_LOG_CAP: usize = 2000;
 
 /// Whether a battery reading crossed the low-battery threshold, for the caller deciding whether
 /// to raise or clear a notification.
@@ -241,6 +249,10 @@ impl AppState {
         };
         if let Err(error) = self.store.events().create(&record) {
             tracing::warn!(%error, kind, "could not record a device event in the history");
+            return;
+        }
+        if let Err(error) = prune_event_log(&self.store, EVENT_LOG_CAP) {
+            tracing::warn!(%error, "could not prune the device event log");
         }
     }
 
@@ -405,6 +417,39 @@ fn read_low_battery_threshold(store: &Store) -> u8 {
         .unwrap_or(DEFAULT_LOW_BATTERY_THRESHOLD)
 }
 
+/// Prune the event log back down to `cap` when it holds more, deleting the oldest entries first.
+/// A free function taking a bare [`Store`], not an [`AppState`] method, so it is directly
+/// testable against a temporary store the way [`read_low_battery_threshold`] above is; returns
+/// how many entries were actually removed.
+///
+/// # Errors
+///
+/// Returns [`StoreError`] when the embedded store cannot be reached. [`AppState::record_event`]
+/// logs and drops that rather than let a failed prune take down the write that triggered it.
+// vertexia: the embedded query engine has no ORDER BY/LIMIT on a record field
+// (`hyperpace_store::collection`'s own doc comment: every collection is one opaque `data: JSON`
+// document), so finding the oldest entries means listing the whole collection every time an
+// event is appended past the cap. The real ceiling this imposes is one list of at most `cap + 1`
+// small `EventRecord` documents (a few hundred KB at `EVENT_LOG_CAP`), not truly unbounded, and
+// event appends are rare: only device state transitions (`history_line`), never the 5 second
+// battery poll. Upgrade path: give `EventRecord` an indexed `at` field in the schema so the store
+// can push the ordering to the query engine instead of sorting here.
+fn prune_event_log(store: &Store, cap: usize) -> Result<usize, StoreError> {
+    let mut events = store.events().list()?;
+    if events.len() <= cap {
+        return Ok(0);
+    }
+    events.sort_by_key(|(_, record)| record.at);
+    let excess = events.len() - cap;
+    let mut pruned = 0;
+    for (id, _) in events.into_iter().take(excess) {
+        if store.events().delete(&id)? {
+            pruned += 1;
+        }
+    }
+    Ok(pruned)
+}
+
 /// Open a transport for `backend` and spawn its owner thread, returning the handle and whether
 /// the transport is the mouse's own cable.
 fn open_connection(
@@ -413,7 +458,19 @@ fn open_connection(
 ) -> Result<(DeviceHandle, bool), AppError> {
     let (transport, wired): (Box<dyn Transport>, bool) = match backend {
         DeviceBackendDto::Simulator => {
-            let (transport, _controller) = SimTransport::new(SIM_CID, SIM_MID, SIM_LINK_BYTE);
+            // Development mode with a real device's settings dump reports the production model's
+            // identity (cid 102, mid 1, 2.4 GHz at 8000 Hz), since that is the table the dump
+            // decodes against.
+            let shadow = crate::dev::simulator_shadow();
+            let (cid, mid, link_byte) = if shadow.is_some() {
+                (102, 1, 5)
+            } else {
+                (SIM_CID, SIM_MID, SIM_LINK_BYTE)
+            };
+            let (transport, controller) = SimTransport::new(cid, mid, link_byte);
+            if let Some(shadow) = shadow {
+                controller.set_flash(0, &shadow);
+            }
             (Box::new(transport), false)
         }
         DeviceBackendDto::RealDevice => {
@@ -433,20 +490,18 @@ fn open_connection(
 /// transition.
 fn history_line(event: DeviceEvent) -> Option<(&'static str, String)> {
     match event {
+        // The link, not its polling ceiling: "up to 8000 Hz" reads as the rate the mouse is set
+        // to, which this event does not know.
         DeviceEvent::Connected(identity) => Some((
             "connected",
-            format!(
-                "Connected over {} at up to {} Hz.",
-                if matches!(
-                    identity.link,
-                    hyperpace_protocol::LinkType::Wired1k | hyperpace_protocol::LinkType::Wired8k
-                ) {
-                    "a wired link"
-                } else {
-                    "2.4 GHz"
-                },
-                identity.link.max_polling_hz()
-            ),
+            if matches!(
+                identity.link,
+                hyperpace_protocol::LinkType::Wired1k | hyperpace_protocol::LinkType::Wired8k
+            ) {
+                "Connected by cable.".to_owned()
+            } else {
+                "Connected over 2.4 GHz.".to_owned()
+            },
         )),
         DeviceEvent::Disconnected => Some(("disconnected", "The mouse disconnected.".to_owned())),
         DeviceEvent::Offline => Some((
@@ -573,7 +628,7 @@ mod tests {
     fn a_connect_line_names_the_link_the_device_reported() {
         let (kind, message) = history_line(DeviceEvent::Connected(identity())).unwrap();
         assert_eq!(kind, "connected");
-        assert_eq!(message, "Connected over 2.4 GHz at up to 2000 Hz.");
+        assert_eq!(message, "Connected over 2.4 GHz.");
     }
 
     #[test]
@@ -632,5 +687,78 @@ mod tests {
         tracked.apply(DeviceEvent::Offline, 15);
         assert!(!tracked.online);
         assert_eq!(tracked.battery, Some(battery(80, false)));
+    }
+
+    fn open_temp_store() -> (Store, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(dir.path()).unwrap();
+        (store, dir)
+    }
+
+    fn seed_event(store: &Store, at: i64) {
+        store
+            .events()
+            .create(&EventRecord {
+                at,
+                kind: "connected".to_owned(),
+                message: format!("event at {at}"),
+                detail: None,
+            })
+            .unwrap();
+    }
+
+    #[test]
+    fn pruning_under_the_cap_does_nothing() {
+        let (store, _dir) = open_temp_store();
+        for at in 0..5 {
+            seed_event(&store, at);
+        }
+        assert_eq!(prune_event_log(&store, 10).unwrap(), 0);
+        assert_eq!(store.events().list().unwrap().len(), 5);
+    }
+
+    #[test]
+    fn pruning_over_the_cap_deletes_the_oldest_first() {
+        let (store, _dir) = open_temp_store();
+        for at in 0..10 {
+            seed_event(&store, at);
+        }
+        let pruned = prune_event_log(&store, 4).unwrap();
+        assert_eq!(pruned, 6);
+        let remaining = store.events().list().unwrap();
+        assert_eq!(remaining.len(), 4);
+        let mut ats: Vec<i64> = remaining.into_iter().map(|(_, record)| record.at).collect();
+        ats.sort_unstable();
+        // The four most recent (highest `at`) survive; every older one is gone.
+        assert_eq!(ats, vec![6, 7, 8, 9]);
+    }
+
+    #[test]
+    fn record_event_prunes_the_log_once_it_grows_past_the_cap() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(dir.path()).unwrap();
+        for at in 0..3 {
+            seed_event(&store, at);
+        }
+        // record_event itself needs an AppHandle this unit test has none of; exercising the same
+        // create-then-prune sequence directly against a tiny cap proves the mechanism without
+        // needing a running Tauri app.
+        store
+            .events()
+            .create(&EventRecord {
+                at: 3,
+                kind: "connected".to_owned(),
+                message: "newest".to_owned(),
+                detail: None,
+            })
+            .unwrap();
+        prune_event_log(&store, 2).unwrap();
+        let remaining = store.events().list().unwrap();
+        assert_eq!(remaining.len(), 2);
+        assert!(
+            remaining
+                .iter()
+                .any(|(_, record)| record.message == "newest")
+        );
     }
 }
