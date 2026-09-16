@@ -303,6 +303,21 @@ pub fn pair_state(frame: &Frame) -> Result<PairState, ProtocolError> {
     })
 }
 
+/// Decode a `GetLongRangeMode` (23) reply: whether long range mode is on.
+///
+/// Not part of the flash shadow (section 7.9): long range is a dedicated command pair, so this
+/// parser, unlike [`crate::settings::Shadow::settings`], is the only way to learn its state.
+///
+/// # Errors
+///
+/// Returns [`ProtocolError::WrongCommand`] if `frame` did not answer command 23, and
+/// [`ProtocolError::Unsupported`] if the device marked long range unsupported (status 1): a
+/// caller must map that to an honest "unsupported" state, never to `false`.
+pub fn long_range(frame: &Frame) -> Result<bool, ProtocolError> {
+    expect_reply(frame, 23)?;
+    Ok(frame.payload[0] == 1)
+}
+
 /// A `StatusChanged` (command 10) push, decoded for the mouse's bit assignments (section 9.4);
 /// bits 0x10 and 0x80 are keyboard-only and carry no meaning here.
 // Six independent, orthogonal change flags, matching the device's own bitmask (section 9.4)
@@ -426,6 +441,35 @@ mod tests {
         let state = pair_state(&frame).unwrap();
         assert_eq!(state.state, PairPhase::Pairing);
         assert_eq!(state.seconds_left, 18);
+    }
+
+    #[test]
+    fn long_range_reads_the_on_flag() {
+        let on = reply(23, 0, &[1]);
+        assert_eq!(long_range(&on), Ok(true));
+        let off = reply(23, 0, &[0]);
+        assert_eq!(long_range(&off), Ok(false));
+    }
+
+    #[test]
+    fn long_range_reports_unsupported_status_not_a_silent_off() {
+        let frame = reply(23, 1, &[0]);
+        assert_eq!(
+            long_range(&frame),
+            Err(ProtocolError::Unsupported { command: 23 })
+        );
+    }
+
+    #[test]
+    fn long_range_refuses_a_reply_to_the_wrong_command() {
+        let frame = reply(22, 0, &[1]);
+        assert_eq!(
+            long_range(&frame),
+            Err(ProtocolError::WrongCommand {
+                expected: 23,
+                got: 22
+            })
+        );
     }
 
     #[test]

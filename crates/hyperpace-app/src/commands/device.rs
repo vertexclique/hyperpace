@@ -10,8 +10,9 @@
 use hyperpace_device::DeviceHandle;
 use hyperpace_protocol::settings::SHADOW_LEN;
 use hyperpace_protocol::{
-    ButtonAction, Command, Keystroke, LightMode, Lod, ModelTable, ProtocolError, ReceiverLight,
-    SleepTime, config_file, dpi_to_bytes, offset, polling_to_byte, request, response, struct_check,
+    ButtonAction, Command, DpiIndicatorMode, Keystroke, LightMode, Lod, ModelTable, ProtocolError,
+    ReceiverLight, SleepTime, config_file, dpi_to_bytes, indicator_brightness_to_byte, offset,
+    polling_to_byte, request, response, struct_check,
 };
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State, Window};
@@ -19,7 +20,7 @@ use tauri::{AppHandle, Manager, State, Window};
 use crate::blocking::blocking;
 use crate::dto::{
     ConnectRequest, DeviceBackendDto, DeviceDescriptor, DeviceEventPayload, DeviceStateDto,
-    LightingDto, PairStateDto, ReceiverLightDto, SetButtonRequest, SettingsDto,
+    LightingDto, LongRangeDto, PairStateDto, ReceiverLightDto, SetButtonRequest, SettingsDto,
     WriteSettingRequest,
 };
 use crate::error::{AppError, to_command_result};
@@ -92,10 +93,14 @@ pub async fn device_state(
 
 /// Read every setting from the connected device.
 ///
+/// Long range (`docs/research/mouse-protocol-v2.md` section 7.9) is not part of the flash shadow
+/// [`SettingsDto::from`] converts, so it is queried separately with a dedicated
+/// `GetLongRangeMode` (23) request and merged in.
+///
 /// # Errors
 ///
 /// Returns an error message when no device is connected, its model is unrecognized, or the
-/// device did not answer the read in time.
+/// device did not answer either read in time.
 #[tauri::command]
 pub async fn read_settings(app: AppHandle) -> Result<SettingsDto, String> {
     to_command_result(
@@ -103,10 +108,33 @@ pub async fn read_settings(app: AppHandle) -> Result<SettingsDto, String> {
             let state = app.state::<AppState>();
             let (handle, table, ..) = state.connected_model()?;
             let shadow = handle.read_settings()?;
-            Ok(SettingsDto::from(shadow.settings(table)?))
+            let mut dto = SettingsDto::from(shadow.settings(table)?);
+            dto.long_range = query_long_range(&handle)?;
+            Ok(dto)
         })
         .await,
     )
+}
+
+/// Query `GetLongRangeMode` (23) and map its reply to [`LongRangeDto`].
+///
+/// A status-1 reply is not an error here: many models genuinely lack long range, and
+/// [`read_settings`] must still return the rest of the snapshot, honestly marked
+/// [`LongRangeDto::Unsupported`] rather than a silent `false` (the honesty fence,
+/// `docs/architecture/api-contract.md`).
+///
+/// # Errors
+///
+/// Returns [`AppError::Device`] when the request itself could not complete (a timeout or a
+/// disconnected device).
+fn query_long_range(handle: &DeviceHandle) -> Result<LongRangeDto, AppError> {
+    let reply = handle.request(Command::GetLongRange.request(), REQUEST_TIMEOUT)?;
+    match response::long_range(&reply) {
+        Ok(true) => Ok(LongRangeDto::On),
+        Ok(false) => Ok(LongRangeDto::Off),
+        Err(ProtocolError::Unsupported { .. }) => Ok(LongRangeDto::Unsupported),
+        Err(other) => Err(other.into()),
+    }
 }
 
 /// Write one named setting to the connected device.
@@ -337,6 +365,31 @@ fn apply_write_setting(
             let record = ButtonAction::from(action).encode();
             handle.write_block(offset::BUTTONS + u16::from(index) * 4, &record)?;
         }
+        WriteSettingRequest::DpiIndicatorMode { value } => {
+            handle.write_scalar(
+                offset::DPI_INDICATOR,
+                DpiIndicatorMode::from(value).to_byte(),
+            )?;
+        }
+        WriteSettingRequest::DpiIndicatorBrightness { level } => {
+            handle.write_scalar(
+                offset::DPI_INDICATOR_BRIGHTNESS,
+                indicator_brightness_to_byte(level),
+            )?;
+        }
+        WriteSettingRequest::DpiIndicatorSpeed { speed } => {
+            handle.write_scalar(offset::DPI_INDICATOR_SPEED, speed)?;
+        }
+        WriteSettingRequest::DpiIndicatorOn { on } => {
+            handle.write_scalar(offset::DPI_INDICATOR_ON, u8::from(on))?;
+        }
+        WriteSettingRequest::LongRange { on } => {
+            // Not a flash scalar (section 7.9): a dedicated command pair, routed through the same
+            // `DeviceHandle::request` escape hatch `receiver_light` and `set_profile` use, not
+            // `write_scalar`. The reply is ignored, matching `SetLongRangeMode`'s own documented
+            // "ignored" response and the same pattern `receiver_light` follows below.
+            handle.request(request::set_long_range(on), REQUEST_TIMEOUT)?;
+        }
     }
     Ok(())
 }
@@ -375,15 +428,24 @@ mod tests {
     #![allow(clippy::unwrap_used)]
 
     use super::*;
-    use hyperpace_device::{Access, SimTransport};
+    use hyperpace_device::{Access, SimController, SimTransport};
     use hyperpace_protocol::model::CID_62_MID_1;
     use hyperpace_protocol::{DpiAction, MouseButton};
 
-    use crate::dto::{ButtonActionDto, DpiActionDto, LightModeDto, MouseButtonDto, SleepTimeDto};
+    use crate::dto::{
+        ButtonActionDto, DpiActionDto, DpiIndicatorModeDto, LightModeDto, MouseButtonDto,
+        SleepTimeDto,
+    };
 
     fn connected_handle() -> DeviceHandle {
         let (transport, _controller) = SimTransport::new(62, 1, 4);
         hyperpace_device::spawn(Box::new(transport), Access::ReadWrite).unwrap()
+    }
+
+    fn connected_handle_with_controller() -> (DeviceHandle, SimController) {
+        let (transport, controller) = SimTransport::new(62, 1, 4);
+        let handle = hyperpace_device::spawn(Box::new(transport), Access::ReadWrite).unwrap();
+        (handle, controller)
     }
 
     #[test]
@@ -574,5 +636,72 @@ mod tests {
         .unwrap();
         let shadow = handle.read_settings().unwrap();
         assert_eq!(shadow.scalar(offset::PERF_TIMEOUT), 6);
+    }
+
+    #[test]
+    fn dpi_indicator_fields_write_their_documented_offsets() {
+        let handle = connected_handle();
+        apply_write_setting(
+            &handle,
+            &CID_62_MID_1,
+            WriteSettingRequest::DpiIndicatorMode {
+                value: DpiIndicatorModeDto::Breathing,
+            },
+        )
+        .unwrap();
+        apply_write_setting(
+            &handle,
+            &CID_62_MID_1,
+            WriteSettingRequest::DpiIndicatorBrightness { level: 5 },
+        )
+        .unwrap();
+        apply_write_setting(
+            &handle,
+            &CID_62_MID_1,
+            WriteSettingRequest::DpiIndicatorSpeed { speed: 7 },
+        )
+        .unwrap();
+        apply_write_setting(
+            &handle,
+            &CID_62_MID_1,
+            WriteSettingRequest::DpiIndicatorOn { on: true },
+        )
+        .unwrap();
+
+        let shadow = handle.read_settings().unwrap();
+        assert_eq!(shadow.scalar(offset::DPI_INDICATOR), 2); // breathing
+        assert_eq!(shadow.scalar(offset::DPI_INDICATOR_BRIGHTNESS), 128); // level 5
+        assert_eq!(shadow.scalar(offset::DPI_INDICATOR_SPEED), 7);
+        assert_eq!(shadow.scalar(offset::DPI_INDICATOR_ON), 1);
+    }
+
+    #[test]
+    fn long_range_write_round_trips_against_the_simulator() {
+        let handle = connected_handle();
+        apply_write_setting(
+            &handle,
+            &CID_62_MID_1,
+            WriteSettingRequest::LongRange { on: true },
+        )
+        .unwrap();
+        assert_eq!(query_long_range(&handle).unwrap(), LongRangeDto::On);
+
+        apply_write_setting(
+            &handle,
+            &CID_62_MID_1,
+            WriteSettingRequest::LongRange { on: false },
+        )
+        .unwrap();
+        assert_eq!(query_long_range(&handle).unwrap(), LongRangeDto::Off);
+    }
+
+    #[test]
+    fn query_long_range_reports_unsupported_honestly_not_as_off() {
+        let (handle, controller) = connected_handle_with_controller();
+        controller.set_unsupported(23, true);
+        assert_eq!(
+            query_long_range(&handle).unwrap(),
+            LongRangeDto::Unsupported
+        );
     }
 }

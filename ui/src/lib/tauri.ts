@@ -9,15 +9,24 @@
 // returning invented device data.
 
 import { invoke as tauriInvoke, Channel } from '@tauri-apps/api/core';
-import type { DeviceEvent } from './types';
+import type { CommandName } from './generated/commands';
+import type { DeviceEvent, FirmwareProgress } from './types';
+
+export { Channel };
 
 export const runningInTauri =
 	typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 const NOT_IN_SHELL = 'Not running inside the Hyperpace desktop app.';
 
-/** Calls a Tauri command, surfacing the real error message on failure. */
-export async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+/**
+ * Calls a Tauri command, surfacing the real error message on failure.
+ *
+ * `command` is restricted to `CommandName` (generated/commands.ts, kept in sync with
+ * `command_list::COMMANDS` by the Rust test in `tests/frontend_contract.rs`), so a renamed or
+ * misspelled command name fails to type-check instead of failing at runtime.
+ */
+export async function invoke<T>(command: CommandName, args?: Record<string, unknown>): Promise<T> {
 	if (!runningInTauri) {
 		throw new Error(NOT_IN_SHELL);
 	}
@@ -25,15 +34,23 @@ export async function invoke<T>(command: string, args?: Record<string, unknown>)
 }
 
 /**
- * Opens the per-window device event channel described in the contract
- * ("Events to the UI go over one Channel<DeviceEvent> per window,
- * re-subscribed when a destroyed window is recreated"). The channel is
- * created here and handed to `connect` as the `events` argument; the exact
- * argument name is a UI-side bridging choice, not yet fixed by the
- * contract, since only the command list is specified there.
+ * Opens the per-window device event channel the contract describes ("Events to the UI go over
+ * one Channel<DeviceEvent> per window, re-subscribed when a destroyed window is recreated"). The
+ * channel is handed to the `device_state` command's `channel` argument, the command that both
+ * registers it and returns the current connection snapshot; `connect` and `disconnect` do not
+ * take a channel.
  */
 export function openDeviceEventChannel(onEvent: (event: DeviceEvent) => void): Channel<DeviceEvent> {
 	const channel = new Channel<DeviceEvent>();
 	channel.onmessage = onEvent;
+	return channel;
+}
+
+/** Opens a fresh progress channel for one `firmware_install` call. */
+export function openFirmwareProgressChannel(
+	onProgress: (progress: FirmwareProgress) => void
+): Channel<FirmwareProgress> {
+	const channel = new Channel<FirmwareProgress>();
+	channel.onmessage = onProgress;
 	return channel;
 }

@@ -49,10 +49,10 @@ pub use macros::{MacroEvent, MacroEventKind, MacroSlot};
 pub use model::{DpiRange, ModelTable, table_for};
 pub use response::{
     Battery, DeviceIdentity, LinkType, PairPhase, PairState, ProtocolError, StatusChanged, Version,
-    battery, identity, online, pair_state, status_changed, version,
+    battery, identity, long_range, online, pair_state, status_changed, version,
 };
 pub use settings::{
-    DpiStage, LightMode, Lighting, Lod, Performance, ReceiverLight, Settings, Shadow, SleepTime,
-    offset,
+    DpiIndicator, DpiIndicatorMode, DpiStage, LightMode, Lighting, Lod, Performance, ReceiverLight,
+    Settings, Shadow, SleepTime, offset,
 };
 pub use transport::{Transport, TransportError};

@@ -1,21 +1,18 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { device } from '../device.svelte';
-	import type { MacroEvent, MacroSlot } from '../types';
-	import { MACRO_EVENT_MAX_COUNT, MACRO_NAME_MAX_BYTES } from '../types';
+	import type { MacroEvent, SaveMacroRequest } from '../types';
+	import { MACRO_EVENT_KINDS, MACRO_EVENT_MAX_COUNT, MACRO_NAME_MAX_BYTES } from '../types';
 	import EmptyState from '../components/EmptyState.svelte';
 	import SelectField from '../components/SelectField.svelte';
 
-	const EVENT_KINDS = [
-		{ value: 0, label: 'Modifier' },
-		{ value: 1, label: 'Key' },
-		{ value: 2, label: 'Media' },
-		{ value: 4, label: 'Mouse button' },
-		{ value: 7, label: 'Context menu' }
-	];
+	// MacroEventRecord::kind is a free-form string, not a serde-tagged enum (hyperpace-store
+	// never depends on hyperpace-protocol); these are the only names
+	// `commands::macros::kind_from_string` recognizes.
+	const EVENT_KINDS = MACRO_EVENT_KINDS.map((kind) => ({ value: kind, label: kind }));
 
-	let selectedSlot = $state<number | null>(null);
-	let draft = $state<MacroSlot | null>(null);
+	let selectedId = $state<string | null>(null);
+	let draft = $state<SaveMacroRequest | null>(null);
 	let saving = $state(false);
 	let confirmingDelete = $state(false);
 
@@ -26,24 +23,26 @@
 	let nameBytes = $derived(draft ? new TextEncoder().encode(draft.name).length : 0);
 	let nameTooLong = $derived(nameBytes > MACRO_NAME_MAX_BYTES);
 
-	function selectMacro(macro: MacroSlot) {
-		selectedSlot = macro.slot;
+	function selectMacro(macro: SaveMacroRequest & { id: string }) {
+		selectedId = macro.id;
 		draft = structuredClone(macro);
 		confirmingDelete = false;
 	}
 
 	function newMacro() {
-		const usedSlots = new Set(device.macros.map((m) => m.slot));
+		const usedSlots = new Set(
+			device.macros.map((m) => m.slot).filter((slot): slot is number => slot !== undefined)
+		);
 		let slot = 0;
 		while (usedSlots.has(slot)) slot += 1;
-		selectedSlot = slot;
-		draft = { slot, name: 'New macro', events: [] };
+		selectedId = null;
+		draft = { name: 'New macro', slot, events: [] };
 		confirmingDelete = false;
 	}
 
 	function addEvent() {
 		if (!draft || draft.events.length >= MACRO_EVENT_MAX_COUNT) return;
-		const event: MacroEvent = { press: true, kind: 1, value: 0, delay_ms: 10 };
+		const event: MacroEvent = { press: true, kind: 'Key', value: 0, delayMs: 10 };
 		draft.events = [...draft.events, event];
 	}
 
@@ -65,16 +64,19 @@
 		if (!draft || nameTooLong) return;
 		saving = true;
 		try {
-			await device.saveMacro(draft);
+			const saved = await device.saveMacro(draft);
+			// A newly created macro only gets its store id back from the response; adopt it so a
+			// second save updates this record instead of creating another one.
+			if (saved) selectedId = saved.id;
 		} finally {
 			saving = false;
 		}
 	}
 
 	async function remove() {
-		if (selectedSlot === null) return;
-		await device.deleteMacro(selectedSlot);
-		selectedSlot = null;
+		if (selectedId === null) return;
+		await device.deleteMacro(selectedId);
+		selectedId = null;
 		draft = null;
 		confirmingDelete = false;
 	}
@@ -91,15 +93,15 @@
 			<p class="field-hint">No macros saved yet.</p>
 		{:else}
 			<ul class="macro-list">
-				{#each device.macros as macro (macro.slot)}
+				{#each device.macros as macro (macro.id)}
 					<li>
 						<button
 							type="button"
 							class="list-row"
-							class:active={selectedSlot === macro.slot}
+							class:active={selectedId === macro.id}
 							onclick={() => selectMacro(macro)}
 						>
-							<span>{macro.name || `Slot ${macro.slot}`}</span>
+							<span>{macro.name || (macro.slot !== undefined ? `Slot ${macro.slot}` : 'Untitled')}</span>
 							<span class="field-hint">{macro.events.length} events</span>
 						</button>
 					</li>
@@ -180,7 +182,7 @@
 									type="number"
 									min="0"
 									max="65535"
-									bind:value={ev.delay_ms}
+									bind:value={ev.delayMs}
 								/>
 								<div class="event-actions">
 									<button class="btn" onclick={() => moveEvent(i, -1)} disabled={i === 0}>Up</button>

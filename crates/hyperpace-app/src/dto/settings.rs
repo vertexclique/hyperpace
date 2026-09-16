@@ -1,8 +1,9 @@
 //! Settings snapshot, button action and write-request shapes.
 
 use hyperpace_protocol::{
-    ButtonAction, DpiAction, DpiStage, Keystroke, LightMode, Lighting, Lod, MacroCycles, Modifier,
-    MouseButton, Performance, ScrollDirection, Settings, SleepTime,
+    ButtonAction, DpiAction, DpiIndicator, DpiIndicatorMode, DpiStage, Keystroke, LightMode,
+    Lighting, Lod, MacroCycles, Modifier, MouseButton, Performance, ScrollDirection, Settings,
+    SleepTime,
 };
 use serde::{Deserialize, Serialize};
 
@@ -149,6 +150,87 @@ impl From<LightModeDto> for LightMode {
             LightModeDto::Other { byte } => Self::Other(byte),
         }
     }
+}
+
+/// Mirrors [`DpiIndicatorMode`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "mode", rename_all = "camelCase")]
+pub enum DpiIndicatorModeDto {
+    /// See [`DpiIndicatorMode::Off`].
+    Off,
+    /// See [`DpiIndicatorMode::Steady`].
+    Steady,
+    /// See [`DpiIndicatorMode::Breathing`].
+    Breathing,
+    /// See [`DpiIndicatorMode::Other`].
+    Other {
+        /// The raw, unrecognized value.
+        byte: u8,
+    },
+}
+
+impl From<DpiIndicatorMode> for DpiIndicatorModeDto {
+    fn from(mode: DpiIndicatorMode) -> Self {
+        match mode {
+            DpiIndicatorMode::Off => Self::Off,
+            DpiIndicatorMode::Steady => Self::Steady,
+            DpiIndicatorMode::Breathing => Self::Breathing,
+            DpiIndicatorMode::Other(byte) => Self::Other { byte },
+        }
+    }
+}
+
+impl From<DpiIndicatorModeDto> for DpiIndicatorMode {
+    fn from(mode: DpiIndicatorModeDto) -> Self {
+        match mode {
+            DpiIndicatorModeDto::Off => Self::Off,
+            DpiIndicatorModeDto::Steady => Self::Steady,
+            DpiIndicatorModeDto::Breathing => Self::Breathing,
+            DpiIndicatorModeDto::Other { byte } => Self::Other(byte),
+        }
+    }
+}
+
+/// Mirrors [`DpiIndicator`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DpiIndicatorDto {
+    /// Effect mode.
+    pub mode: DpiIndicatorModeDto,
+    /// Brightness level, 1..=10.
+    pub brightness: u8,
+    /// Effect speed, raw; the protocol reference names no mapping for this field.
+    pub speed: u8,
+    /// Whether the indicator light is on.
+    pub on: bool,
+}
+
+impl From<DpiIndicator> for DpiIndicatorDto {
+    fn from(indicator: DpiIndicator) -> Self {
+        Self {
+            mode: indicator.mode.into(),
+            brightness: indicator.brightness,
+            speed: indicator.speed,
+            on: indicator.on,
+        }
+    }
+}
+
+/// Long range mode: on, off, or unsupported on the connected model. Not part of the flash shadow
+/// (section 7.9): [`crate::commands::device::read_settings`] fills this from a dedicated
+/// `GetLongRangeMode` (23) request alongside the shadow read, and maps a status-1 reply to
+/// [`Self::Unsupported`] rather than a silent `false` (the honesty fence,
+/// `docs/architecture/api-contract.md`). Fully fieldless, so it serializes as a bare camelCase
+/// string, not a tagged object (see the "Wire format" note there).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LongRangeDto {
+    /// Long range mode is on.
+    On,
+    /// Long range mode is off.
+    Off,
+    /// The device answered status 1 (unsupported) to `GetLongRangeMode`.
+    Unsupported,
 }
 
 /// Mirrors [`Performance`].
@@ -452,7 +534,8 @@ impl From<ButtonActionDto> for ButtonAction {
     }
 }
 
-/// A full settings snapshot, mirroring [`Settings`].
+/// A full settings snapshot, mirroring [`Settings`] plus [`Self::long_range`], which `Settings`
+/// cannot supply (see that field's own doc comment).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsDto {
@@ -482,6 +565,10 @@ pub struct SettingsDto {
     pub buttons: Vec<ButtonActionDto>,
     /// Raw sensor mode: 0 low power, 1 high performance.
     pub sensor_mode: u8,
+    /// The DPI indicator light.
+    pub dpi_indicator: DpiIndicatorDto,
+    /// Long range mode: on, off, or unsupported on this device.
+    pub long_range: LongRangeDto,
 }
 
 impl From<Settings> for SettingsDto {
@@ -500,6 +587,12 @@ impl From<Settings> for SettingsDto {
             lighting: settings.lighting.into(),
             buttons: settings.buttons.into_iter().map(Into::into).collect(),
             sensor_mode: settings.sensor_mode,
+            dpi_indicator: settings.dpi_indicator.into(),
+            // Long range is not part of the flash shadow `Settings` decodes (section 7.9): it is
+            // a dedicated command pair, so this conversion cannot know it. This placeholder is
+            // overwritten by `commands::device::read_settings` immediately after, via a
+            // `GetLongRangeMode` request; no other caller of this `From` impl observes it.
+            long_range: LongRangeDto::Unsupported,
         }
     }
 }
@@ -665,6 +758,32 @@ pub enum WriteSettingRequest {
         /// The new action.
         action: ButtonActionDto,
     },
+    /// [`SettingsDto::dpi_indicator`]'s `mode` field.
+    DpiIndicatorMode {
+        /// The new indicator mode.
+        value: DpiIndicatorModeDto,
+    },
+    /// [`SettingsDto::dpi_indicator`]'s `brightness` field.
+    DpiIndicatorBrightness {
+        /// The new brightness level, 1..=10.
+        level: u8,
+    },
+    /// [`SettingsDto::dpi_indicator`]'s `speed` field.
+    DpiIndicatorSpeed {
+        /// The new raw speed value.
+        speed: u8,
+    },
+    /// [`SettingsDto::dpi_indicator`]'s `on` field.
+    DpiIndicatorOn {
+        /// The new state.
+        on: bool,
+    },
+    /// [`SettingsDto::long_range`]. Not a flash scalar: routed as a `SetLongRangeMode` (22)
+    /// request, not a `write_scalar` call.
+    LongRange {
+        /// The new state.
+        on: bool,
+    },
 }
 
 #[cfg(test)]
@@ -740,10 +859,63 @@ mod tests {
             },
             buttons: vec![ButtonAction::Mouse(MouseButton::Left)],
             sensor_mode: 1,
+            dpi_indicator: DpiIndicator {
+                mode: DpiIndicatorMode::Steady,
+                brightness: 5,
+                speed: 3,
+                on: true,
+            },
         };
         let dto = SettingsDto::from(settings);
         let json = serde_json::to_string(&dto).unwrap();
         let back: SettingsDto = serde_json::from_str(&json).unwrap();
         assert_eq!(back, dto);
+    }
+
+    #[test]
+    fn dpi_indicator_dto_round_trips_every_named_mode() {
+        let modes = [
+            DpiIndicatorMode::Off,
+            DpiIndicatorMode::Steady,
+            DpiIndicatorMode::Breathing,
+            DpiIndicatorMode::Other(9),
+        ];
+        for mode in modes {
+            let indicator = DpiIndicatorDto::from(DpiIndicator {
+                mode,
+                brightness: 7,
+                speed: 3,
+                on: true,
+            });
+            let json = serde_json::to_string(&indicator).unwrap();
+            let back: DpiIndicatorDto = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, indicator);
+            assert_eq!(DpiIndicatorMode::from(back.mode), mode);
+        }
+    }
+
+    #[test]
+    fn long_range_dto_serializes_as_a_bare_string() {
+        assert_eq!(serde_json::to_value(LongRangeDto::On).unwrap(), "on");
+        assert_eq!(serde_json::to_value(LongRangeDto::Off).unwrap(), "off");
+        assert_eq!(
+            serde_json::to_value(LongRangeDto::Unsupported).unwrap(),
+            "unsupported"
+        );
+    }
+
+    #[test]
+    fn write_setting_request_tags_the_new_dpi_indicator_and_long_range_variants() {
+        let mode = WriteSettingRequest::DpiIndicatorMode {
+            value: DpiIndicatorModeDto::Breathing,
+        };
+        let json = serde_json::to_value(mode).unwrap();
+        assert_eq!(json["key"], "dpiIndicatorMode");
+        assert_eq!(json["value"]["mode"], "breathing");
+
+        let long_range = WriteSettingRequest::LongRange { on: true };
+        let json = serde_json::to_value(long_range).unwrap();
+        assert_eq!(json["key"], "longRange");
+        assert_eq!(json["on"], true);
     }
 }

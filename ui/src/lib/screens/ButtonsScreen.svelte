@@ -34,16 +34,16 @@
 
 	const BUTTON_LABELS = ['Left click', 'Right click', 'Wheel click', 'Back', 'Forward'];
 
-	const ASSIGNABLE_KINDS: { value: ButtonAction['kind']; label: string }[] = [
-		{ value: 'Disabled', label: 'Disabled' },
-		{ value: 'Mouse', label: 'Mouse button' },
-		{ value: 'Dpi', label: 'DPI switch' },
-		{ value: 'Scroll', label: 'Scroll' },
-		{ value: 'Fire', label: 'Fire key (rapid click)' },
-		{ value: 'Keystroke', label: 'Keystroke' },
-		{ value: 'Macro', label: 'Macro' },
-		{ value: 'PollingCycle', label: 'Cycle polling rate' },
-		{ value: 'Media', label: 'Media key' }
+	const ASSIGNABLE_KINDS: { value: ButtonAction['type']; label: string }[] = [
+		{ value: 'disabled', label: 'Disabled' },
+		{ value: 'mouse', label: 'Mouse button' },
+		{ value: 'dpi', label: 'DPI switch' },
+		{ value: 'scroll', label: 'Scroll' },
+		{ value: 'fire', label: 'Fire key (rapid click)' },
+		{ value: 'keystroke', label: 'Keystroke' },
+		{ value: 'macro', label: 'Macro' },
+		{ value: 'pollingCycle', label: 'Cycle polling rate' },
+		{ value: 'media', label: 'Media key' }
 	];
 
 	let selected = $state<number | null>(null);
@@ -61,41 +61,41 @@
 		selected = index;
 	}
 
-	function setKind(kind: ButtonAction['kind']) {
+	function setKind(type: ButtonAction['type']) {
 		if (!draft) return;
-		draft = defaultForKind(kind);
+		draft = defaultForKind(type);
 	}
 
-	function defaultForKind(kind: ButtonAction['kind']): ButtonAction {
-		switch (kind) {
-			case 'Disabled':
-				return { kind: 'Disabled' };
-			case 'Mouse':
-				return { kind: 'Mouse', button: 'Left' };
-			case 'Dpi':
-				return { kind: 'Dpi', action: 'Loop' };
-			case 'Scroll':
-				return { kind: 'Scroll', direction: 'Left' };
-			case 'Fire':
-				return { kind: 'Fire', times: 0, interval_ms: 20 };
-			case 'Keystroke':
-				return { kind: 'Keystroke' };
-			case 'Macro':
-				return { kind: 'Macro', slot: 0, cycles: { kind: 'Times', count: 1 } };
-			case 'PollingCycle':
-				return { kind: 'PollingCycle' };
-			case 'Media':
-				return { kind: 'Media', usage: MEDIA_KEYS[0].usage };
+	function defaultForKind(type: ButtonAction['type']): ButtonAction {
+		switch (type) {
+			case 'disabled':
+				return { type: 'disabled' };
+			case 'mouse':
+				return { type: 'mouse', button: 'left' };
+			case 'dpi':
+				return { type: 'dpi', action: 'loop' };
+			case 'scroll':
+				return { type: 'scroll', direction: 'left' };
+			case 'fire':
+				return { type: 'fire', times: 0, intervalMs: 20 };
+			case 'keystroke':
+				return { type: 'keystroke' };
+			case 'macro':
+				return { type: 'macro', slot: 0, cycles: { cycles: 'times', n: 1 } };
+			case 'pollingCycle':
+				return { type: 'pollingCycle' };
+			case 'media':
+				return { type: 'media', usage: MEDIA_KEYS[0].usage };
 			default:
-				return { kind: 'Disabled' };
+				return { type: 'disabled' };
 		}
 	}
 
-	function setCyclesKind(kind: MacroCycles['kind']) {
-		if (!draft || draft.kind !== 'Macro') return;
+	function setCyclesKind(cycles: MacroCycles['cycles']) {
+		if (!draft || draft.type !== 'macro') return;
 		draft = {
 			...draft,
-			cycles: kind === 'Times' ? { kind: 'Times', count: 1 } : { kind }
+			cycles: cycles === 'times' ? { cycles: 'times', n: 1 } : { cycles }
 		};
 	}
 
@@ -110,27 +110,27 @@
 	}
 
 	function actionSummary(action: ButtonAction): string {
-		switch (action.kind) {
-			case 'Disabled':
+		switch (action.type) {
+			case 'disabled':
 				return 'Disabled';
-			case 'Mouse':
+			case 'mouse':
 				return `Mouse: ${action.button}`;
-			case 'Dpi':
+			case 'dpi':
 				return `DPI ${action.action}`;
-			case 'Scroll':
+			case 'scroll':
 				return `Scroll ${action.direction}`;
-			case 'Fire':
+			case 'fire':
 				return action.times === 0 ? 'Fire while held' : `Fire x${action.times}`;
-			case 'Keystroke':
+			case 'keystroke':
 				return 'Keystroke';
-			case 'Macro':
+			case 'macro':
 				return `Macro slot ${action.slot}`;
-			case 'PollingCycle':
+			case 'pollingCycle':
 				return 'Cycle polling rate';
-			case 'Media':
+			case 'media':
 				return MEDIA_KEYS.find((m) => m.usage === action.usage)?.label ?? `Media 0x${action.usage.toString(16)}`;
-			case 'Unknown':
-				return `Unrecognized (kind ${action.button_kind})`;
+			case 'unknown':
+				return `Unrecognized (kind ${action.kind})`;
 		}
 	}
 </script>
@@ -177,105 +177,105 @@
 				<div class="grid" style="gap: 14px">
 					<SelectField
 						label="Action"
-						value={draft.kind}
+						value={draft.type}
 						options={ASSIGNABLE_KINDS}
 						onchange={(k) => setKind(k)}
 					/>
 
-					{#if draft.kind === 'Mouse'}
+					{#if draft.type === 'mouse'}
 						<SelectField
 							label="Mouse button"
 							value={draft.button}
 							options={[
-								{ value: 'Left', label: 'Left' },
-								{ value: 'Right', label: 'Right' },
-								{ value: 'Wheel', label: 'Wheel' },
-								{ value: 'Backward', label: 'Backward' },
-								{ value: 'Forward', label: 'Forward' }
+								{ value: 'left', label: 'Left' },
+								{ value: 'right', label: 'Right' },
+								{ value: 'middle', label: 'Middle (wheel click)' },
+								{ value: 'backward', label: 'Backward' },
+								{ value: 'forward', label: 'Forward' }
 							]}
-							onchange={(v) => draft && draft.kind === 'Mouse' && (draft.button = v)}
+							onchange={(v) => draft && draft.type === 'mouse' && (draft.button = v)}
 						/>
-					{:else if draft.kind === 'Dpi'}
+					{:else if draft.type === 'dpi'}
 						<SelectField
 							label="DPI action"
 							value={draft.action}
 							options={[
-								{ value: 'Loop', label: 'Loop through stages' },
-								{ value: 'Increase', label: 'DPI +' },
-								{ value: 'Decrease', label: 'DPI -' }
+								{ value: 'loop', label: 'Loop through stages' },
+								{ value: 'increase', label: 'DPI +' },
+								{ value: 'decrease', label: 'DPI -' }
 							]}
-							onchange={(v) => draft && draft.kind === 'Dpi' && (draft.action = v)}
+							onchange={(v) => draft && draft.type === 'dpi' && (draft.action = v)}
 						/>
-					{:else if draft.kind === 'Scroll'}
+					{:else if draft.type === 'scroll'}
 						<SelectField
 							label="Scroll direction"
 							value={draft.direction}
 							options={[
-								{ value: 'Left', label: 'Scroll left' },
-								{ value: 'Right', label: 'Scroll right' }
+								{ value: 'left', label: 'Scroll left' },
+								{ value: 'right', label: 'Scroll right' }
 							]}
-							onchange={(v) => draft && draft.kind === 'Scroll' && (draft.direction = v)}
+							onchange={(v) => draft && draft.type === 'scroll' && (draft.direction = v)}
 						/>
-					{:else if draft.kind === 'Fire'}
+					{:else if draft.type === 'fire'}
 						<RangeField
 							label="Times"
 							hint="0 repeats for as long as the button is held"
 							min={0}
 							max={3}
 							value={draft.times}
-							onchange={(v) => draft && draft.kind === 'Fire' && (draft.times = v)}
+							onchange={(v) => draft && draft.type === 'fire' && (draft.times = v)}
 						/>
 						<RangeField
 							label="Interval"
 							unit=" ms"
 							min={10}
 							max={255}
-							value={draft.interval_ms}
-							onchange={(v) => draft && draft.kind === 'Fire' && (draft.interval_ms = v)}
+							value={draft.intervalMs}
+							onchange={(v) => draft && draft.type === 'fire' && (draft.intervalMs = v)}
 						/>
-					{:else if draft.kind === 'Keystroke'}
+					{:else if draft.type === 'keystroke'}
 						<p class="field-hint">
 							Key assignment needs a keystroke-slot Tauri command; the fixed command surface in
 							docs/architecture/api-contract.md does not yet expose one. The button can be set to
 							type Keystroke, but its key content cannot be edited from this screen yet.
 						</p>
-					{:else if draft.kind === 'Macro'}
+					{:else if draft.type === 'macro'}
 						<RangeField
 							label="Macro slot"
 							min={0}
 							max={31}
 							value={draft.slot}
-							onchange={(v) => draft && draft.kind === 'Macro' && (draft.slot = v)}
+							onchange={(v) => draft && draft.type === 'macro' && (draft.slot = v)}
 						/>
 						<SelectField
 							label="Repeat"
-							value={draft.cycles.kind}
+							value={draft.cycles.cycles}
 							options={[
-								{ value: 'Times', label: 'Fixed number of cycles' },
-								{ value: 'UntilReleased', label: 'Until the button is released' },
-								{ value: 'UntilAnyButton', label: 'Until any button is pressed' }
+								{ value: 'times', label: 'Fixed number of cycles' },
+								{ value: 'untilReleased', label: 'Until the button is released' },
+								{ value: 'untilAnyPress', label: 'Until any button is pressed' }
 							]}
 							onchange={(v) => setCyclesKind(v)}
 						/>
-						{#if draft.cycles.kind === 'Times'}
+						{#if draft.cycles.cycles === 'times'}
 							<RangeField
 								label="Cycles"
 								min={1}
 								max={250}
-								value={draft.cycles.count}
+								value={draft.cycles.n}
 								onchange={(v) =>
 									draft &&
-									draft.kind === 'Macro' &&
-									draft.cycles.kind === 'Times' &&
-									(draft.cycles.count = v)}
+									draft.type === 'macro' &&
+									draft.cycles.cycles === 'times' &&
+									(draft.cycles.n = v)}
 							/>
 						{/if}
-					{:else if draft.kind === 'Media'}
+					{:else if draft.type === 'media'}
 						<SelectField
 							label="Media key"
 							value={draft.usage}
 							options={MEDIA_KEYS.map((m) => ({ value: m.usage, label: m.label }))}
-							onchange={(v) => draft && draft.kind === 'Media' && (draft.usage = v)}
+							onchange={(v) => draft && draft.type === 'media' && (draft.usage = v)}
 						/>
 					{/if}
 				</div>

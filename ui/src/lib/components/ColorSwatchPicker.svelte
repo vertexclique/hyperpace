@@ -8,20 +8,15 @@
 		onchange?: (color: RgbColor) => void;
 	}
 
-	let { color = $bindable({ r: 255, g: 255, b: 255 }), label, disabled = false, onchange }: Props =
-		$props();
+	let { color = $bindable([255, 255, 255]), label, disabled = false, onchange }: Props = $props();
 
 	function toHex(c: RgbColor): string {
 		const part = (n: number) => n.toString(16).padStart(2, '0');
-		return `#${part(c.r)}${part(c.g)}${part(c.b)}`;
+		return `#${part(c[0])}${part(c[1])}${part(c[2])}`;
 	}
 
 	function fromHex(hex: string): RgbColor {
-		return {
-			r: parseInt(hex.slice(1, 3), 16),
-			g: parseInt(hex.slice(3, 5), 16),
-			b: parseInt(hex.slice(5, 7), 16)
-		};
+		return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
 	}
 
 	function handleInput(e: Event) {

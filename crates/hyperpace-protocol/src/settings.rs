@@ -24,8 +24,15 @@ pub mod offset {
     pub const DPI_VALUE: u16 = 12;
     /// Base of the 8-entry DPI color array, 4 bytes each.
     pub const DPI_COLOR: u16 = 44;
-    /// Base of the DPI indicator block: mode, brightness (+2), speed (+4), on/off (+6).
+    /// DPI indicator mode, 2-byte scalar. [`DPI_INDICATOR_BRIGHTNESS`], [`DPI_INDICATOR_SPEED`]
+    /// and [`DPI_INDICATOR_ON`] sit at fixed offsets alongside it, section 7.6.
     pub const DPI_INDICATOR: u16 = 76;
+    /// DPI indicator brightness, raw byte, 2-byte scalar.
+    pub const DPI_INDICATOR_BRIGHTNESS: u16 = 78;
+    /// DPI indicator speed, raw, 2-byte scalar.
+    pub const DPI_INDICATOR_SPEED: u16 = 80;
+    /// DPI indicator on/off, 2-byte scalar.
+    pub const DPI_INDICATOR_ON: u16 = 82;
     /// Light power-save flag, 2-byte scalar.
     pub const LIGHT_POWER_SAVE: u16 = 94;
     /// Base of the per-button key function array, 4 bytes each.
@@ -189,6 +196,14 @@ impl Shadow {
             lighting,
             buttons,
             sensor_mode: self.scalar(offset::SENSOR_MODE),
+            dpi_indicator: DpiIndicator {
+                mode: DpiIndicatorMode::from_byte(self.scalar(offset::DPI_INDICATOR)),
+                brightness: crate::encoding::indicator_brightness_from_byte(
+                    self.scalar(offset::DPI_INDICATOR_BRIGHTNESS),
+                ),
+                speed: self.scalar(offset::DPI_INDICATOR_SPEED),
+                on: self.scalar(offset::DPI_INDICATOR_ON) != 0,
+            },
         })
     }
 }
@@ -369,6 +384,58 @@ pub struct Lighting {
     pub on: bool,
 }
 
+/// DPI indicator effect mode, offset [`offset::DPI_INDICATOR`] (section 7.6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DpiIndicatorMode {
+    /// Raw value 0: the indicator light is off.
+    Off,
+    /// Raw value 1: steady.
+    Steady,
+    /// Raw value 2: breathing.
+    Breathing,
+    /// Any other raw value.
+    Other(u8),
+}
+
+impl DpiIndicatorMode {
+    /// Decode a raw DPI indicator mode byte.
+    #[must_use]
+    pub fn from_byte(byte: u8) -> Self {
+        match byte {
+            0 => Self::Off,
+            1 => Self::Steady,
+            2 => Self::Breathing,
+            other => Self::Other(other),
+        }
+    }
+
+    /// Encode this mode to its raw byte.
+    #[must_use]
+    pub fn to_byte(self) -> u8 {
+        match self {
+            Self::Off => 0,
+            Self::Steady => 1,
+            Self::Breathing => 2,
+            Self::Other(byte) => byte,
+        }
+    }
+}
+
+/// The DPI indicator light: mode, brightness, speed and on/off, offsets [`offset::DPI_INDICATOR`]
+/// onward (section 7.6). Unlike [`ReceiverLight`], this is part of the mouse's own flash shadow,
+/// not a separate command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DpiIndicator {
+    /// Effect mode.
+    pub mode: DpiIndicatorMode,
+    /// Brightness level, 1..=10 (see [`crate::encoding::indicator_brightness_from_byte`]).
+    pub brightness: u8,
+    /// Effect speed, raw; the protocol reference names no mapping for this field.
+    pub speed: u8,
+    /// Whether the indicator light is on.
+    pub on: bool,
+}
+
 /// The receiver's own indicator light (command 24/25, section 10.5). Not part of the mouse's
 /// flash shadow: it is a separate command, sent directly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -414,6 +481,8 @@ pub struct Settings {
     pub buttons: Vec<ButtonAction>,
     /// Raw sensor mode: 0 low power, 1 high performance.
     pub sensor_mode: u8,
+    /// The DPI indicator light.
+    pub dpi_indicator: DpiIndicator,
 }
 
 #[cfg(test)]
@@ -463,6 +532,10 @@ mod tests {
         shadow.apply_read(offset::DPI_COLOR, &[0xff, 0x00, 0x00, 0x56]);
         shadow.apply_read(offset::LIGHTING, &[0x03, 0xff, 0, 0, 0x08, 0x03, 0x48]);
         shadow.apply_read(offset::LIGHT_ON, &[1, 0x54]);
+        shadow.apply_read(offset::DPI_INDICATOR, &[2, 0x53]); // breathing
+        shadow.apply_read(offset::DPI_INDICATOR_BRIGHTNESS, &[128, 0x2d]); // level 5
+        shadow.apply_read(offset::DPI_INDICATOR_SPEED, &[7, 0x4e]);
+        shadow.apply_read(offset::DPI_INDICATOR_ON, &[1, 0x54]);
         for i in 0..u16::from(table.buttons) {
             let record = ButtonAction::Disabled.encode();
             shadow.apply_read(offset::BUTTONS + 4 * i, &record);
@@ -475,6 +548,10 @@ mod tests {
         assert_eq!(settings.dpi_stages[0].color, (0xff, 0, 0));
         assert_eq!(settings.lighting.mode, LightMode::Fixed);
         assert!(settings.lighting.on);
+        assert_eq!(settings.dpi_indicator.mode, DpiIndicatorMode::Breathing);
+        assert_eq!(settings.dpi_indicator.brightness, 5);
+        assert_eq!(settings.dpi_indicator.speed, 7);
+        assert!(settings.dpi_indicator.on);
         assert_eq!(settings.buttons.len(), usize::from(table.buttons));
         assert!(
             settings
@@ -506,10 +583,26 @@ mod tests {
         }
     }
 
+    #[test]
+    fn dpi_indicator_mode_round_trips_its_named_codes() {
+        for code in [0u8, 1, 2, 9] {
+            assert_eq!(DpiIndicatorMode::from_byte(code).to_byte(), code);
+        }
+        assert_eq!(DpiIndicatorMode::from_byte(0), DpiIndicatorMode::Off);
+        assert_eq!(DpiIndicatorMode::from_byte(1), DpiIndicatorMode::Steady);
+        assert_eq!(DpiIndicatorMode::from_byte(2), DpiIndicatorMode::Breathing);
+        assert_eq!(DpiIndicatorMode::from_byte(9), DpiIndicatorMode::Other(9));
+    }
+
     proptest! {
         #[test]
         fn lod_round_trips_for_every_byte(byte: u8) {
             prop_assert_eq!(Lod::from_byte(byte).to_byte(), byte);
+        }
+
+        #[test]
+        fn dpi_indicator_mode_round_trips_for_every_byte(byte: u8) {
+            prop_assert_eq!(DpiIndicatorMode::from_byte(byte).to_byte(), byte);
         }
 
         #[test]

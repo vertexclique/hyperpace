@@ -43,8 +43,8 @@
 		}
 	}
 
-	function formatVersion(v: { major: number; minor: number }) {
-		return `v${v.major}.${v.minor.toString(16).padStart(2, '0')}`;
+	function formatImportedAt(unixSeconds: number) {
+		return new Date(unixSeconds * 1000).toLocaleString();
 	}
 </script>
 
@@ -73,9 +73,9 @@
 				{#each device.firmware as fw (fw.id)}
 					<li class="firmware-row">
 						<div>
-							<div class="field-label">{fw.product} - {formatVersion(fw.version)}</div>
+							<div class="field-label">{fw.product} - v{fw.version}</div>
 							<div class="field-hint">
-								{fw.device_type}, cid {fw.cid} mid {fw.mid}, imported {fw.imported_at}
+								cid {fw.cid} mid {fw.mid}, imported {formatImportedAt(fw.importedAt)}
 							</div>
 						</div>
 						<button
@@ -83,7 +83,11 @@
 							disabled={installingId !== null}
 							onclick={() => install(fw.id)}
 						>
-							{installingId === fw.id ? 'Installing...' : 'Install'}
+							{installingId === fw.id
+								? device.firmwareProgress
+									? `Installing... ${device.firmwareProgress.percent}%`
+									: 'Installing...'
+								: 'Install'}
 						</button>
 					</li>
 				{/each}
@@ -105,6 +109,12 @@
 				{checking ? 'Checking...' : 'Check for updates'}
 			</button>
 		</div>
+		{#if !checking && device.firmwareUpdates.length > 0}
+			<p class="field-hint">
+				{device.firmwareUpdates.length} update{device.firmwareUpdates.length === 1 ? '' : 's'} available
+				for the connected device.
+			</p>
+		{/if}
 
 		<div class="divider"></div>
 

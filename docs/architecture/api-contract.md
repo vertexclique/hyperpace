@@ -60,6 +60,7 @@ pub fn identity(&Frame) -> Result<DeviceIdentity, ProtocolError>;
 pub fn battery(&Frame) -> Result<Battery, ProtocolError>;   // reads 4 payload bytes, not the length byte
 pub fn version(&Frame) -> Result<Version, ProtocolError>;
 pub fn online(&Frame) -> Result<(bool, [u8; 3]), ProtocolError>;
+pub fn long_range(&Frame) -> Result<bool, ProtocolError>;   // command 23; status 1 -> Err(Unsupported)
 
 // model.rs
 pub struct ModelTable { pub cid: u8, pub mid: u8, pub buttons: u8, pub max_dpi: u32,
@@ -71,7 +72,9 @@ pub fn table_for(cid: u8, mid: u8) -> Option<&'static ModelTable>;   // cid 102 
 // settings.rs: the device memory map and a shadow
 pub mod offset { pub const POLLING: u16; pub const DPI_STAGE_COUNT: u16; pub const CURRENT_DPI: u16;
                  pub const LOD: u16; pub const DPI_VALUE: u16; pub const DPI_COLOR: u16;
-                 pub const DPI_INDICATOR: u16; pub const LIGHT_POWER_SAVE: u16; pub const BUTTONS: u16;
+                 pub const DPI_INDICATOR: u16; pub const DPI_INDICATOR_BRIGHTNESS: u16;
+                 pub const DPI_INDICATOR_SPEED: u16; pub const DPI_INDICATOR_ON: u16;
+                 pub const LIGHT_POWER_SAVE: u16; pub const BUTTONS: u16;
                  pub const LIGHTING: u16; pub const LIGHT_ON: u16; pub const DEBOUNCE: u16;
                  pub const MOTION_SYNC: u16; pub const SLEEP: u16; pub const ANGLE: u16;
                  pub const RIPPLE: u16; pub const LIGHT_OFF_MOVING: u16; pub const PERF_ON: u16;
@@ -87,7 +90,13 @@ impl Shadow {
 pub struct Settings { pub polling_hz: u16, pub dpi_stages: Vec<DpiStage>, pub current_stage: u8,
                       pub lod: Lod, pub debounce_ms: u8, pub motion_sync: bool, pub angle_snap: bool,
                       pub ripple: bool, pub performance: Performance, pub sleep: SleepTime,
-                      pub lighting: Lighting, pub buttons: Vec<ButtonAction>, pub sensor_mode: u8 }
+                      pub lighting: Lighting, pub buttons: Vec<ButtonAction>, pub sensor_mode: u8,
+                      pub dpi_indicator: DpiIndicator }
+pub enum DpiIndicatorMode { Off, Steady, Breathing, Other(u8) }
+impl DpiIndicatorMode { pub fn from_byte(u8) -> Self; pub fn to_byte(self) -> u8 }
+pub struct DpiIndicator { pub mode: DpiIndicatorMode, pub brightness: u8, pub speed: u8, pub on: bool }
+// Long range (command 22/23, section 7.9) is not part of Settings/Shadow: it has no flash
+// address, so it is read with response::long_range (below), not Shadow::settings.
 
 // encoding.rs: every value conversion, each with an inverse and a property test
 pub fn polling_to_byte(hz: u16) -> Option<u8>;  pub fn polling_from_byte(u8) -> Option<u16>;
@@ -196,11 +205,47 @@ Tauri commands (all async, all returning `Result<T, String>` rendered for the UI
 `pair_receiver`, `receiver_light`, `export_config`, `import_config`, `firmware_list`,
 `firmware_import`, `firmware_install`, `firmware_check_for_updates`, `app_settings`.
 
-Events to the UI go over one `Channel<DeviceEvent>` per window, re-subscribed when a destroyed
-window is recreated. The tray owns battery display; the window may be closed without exiting.
+Events to the UI go over one `Channel<DeviceEventPayload>` per window, re-subscribed when a
+destroyed window is recreated. `device_state` is the subscribe command: its `channel` argument
+registers this window's channel and its return value is the current connection snapshot; `connect`
+and `disconnect` carry no channel of their own. The tray owns battery display; the window may be
+closed without exiting.
+
+### Wire format
+
+Every request and response type crossing the IPC boundary lives in `hyperpace-app/src/dto/*.rs`
+and derives `#[serde(rename_all = "camelCase")]`, so every JSON field name the UI sends or reads is
+the Rust field name with its first letter lowercased and underscores removed (`real_device` ->
+`realDevice`). A tagged enum (`WriteSettingRequest`, `ButtonActionDto`, `DeviceEventPayload`,
+`LodDto`/`SleepTimeDto`/`LightModeDto`/`LinkTypeDto`/`PairPhaseDto`/`MacroCyclesDto`/
+`DpiIndicatorModeDto`, `AppSettingsRequest`) always serializes to a JSON *object* carrying its own
+`tag` key (`"type"`, `"key"`, `"mode"`, `"value"`, `"kind"`, `"phase"`, `"cycles"`, `"action"`
+respectively) even for a variant with no data (`DeviceEvent::Offline` is `{"type":"offline"}`,
+never the bare string `"Offline"`); an enum with no `tag` attribute (`AccessDto`,
+`DeviceBackendDto`, `MouseButtonDto`, `DpiActionDto`, `ScrollDirectionDto`, `ModifierDto`,
+`LongRangeDto`) serializes as a bare camelCase string instead, since every one of those is fully
+fieldless. A `(u8, u8, u8)` color field serializes as a 3-element JSON array, never a `{r,g,b}`
+object. `ui/src/lib/types.ts` mirrors every one of these shapes field-for-field and tag-for-tag;
+`crates/hyperpace-app/tests/frontend_contract.rs` deserializes a handful of literal frontend
+payloads against the real DTOs to keep the two from drifting apart again, and its command-name-list
+check needs `ui/src/lib/generated/commands.ts` kept in sync with `command_list::COMMANDS` by hand.
+
+`SettingsDto` carries `dpi_indicator: DpiIndicatorDto` (mirrors `hyperpace_protocol::DpiIndicator`
+one-for-one, decoded from the flash shadow like every other settings field) and
+`long_range: LongRangeDto` (`"on"` / `"off"` / `"unsupported"`). Long range is not part of the
+flash shadow: `read_settings` fills it from a dedicated `GetLongRangeMode` (23) request issued
+alongside the shadow read, and maps a status-1 reply to `"unsupported"`, never to `false` (the
+honesty fence, `CLAUDE.md` section 8). `write_setting` gains five matching variants: `dpiIndicatorMode`
+(`{key, value: DpiIndicatorModeDto}`), `dpiIndicatorBrightness`/`dpiIndicatorSpeed` (`{key, level|speed}`,
+plain scalar writes), `dpiIndicatorOn` (`{key, on}`), and `longRange` (`{key, on}`, routed through
+`DeviceHandle::request(request::set_long_range(..))`, not `write_scalar`, since it addresses no
+flash offset).
 
 ## UI
 
 SvelteKit static SPA, dark only, original SVG artwork of mouse and receiver. Screens: Buttons,
 Performance, Macros, Lighting and receiver, Firmware, Settings. The device is called "Hyperpace".
+`ui/src/lib/types.ts` is the frontend half of the wire-format contract above; there is no code
+generation between it and `hyperpace-app/src/dto/*.rs`, so a change to a command signature or DTO
+must be reflected there by hand in the same change.
 No vendor name, logo or model string appears anywhere in the interface.

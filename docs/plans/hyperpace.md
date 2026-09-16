@@ -183,8 +183,16 @@ starting each.
 | Protocol reference | done | `docs/research/mouse-protocol-v2.md` |
 | Firmware spec | done | `docs/research/firmware-update-spec.md` |
 | Phase 0 (de-risk spikes) | skipped | operator decision 2026-09-16; risks carried into the phases that need them |
-| Phase 1 (protocol crate and differential harness) | starting | plan approved 2026-09-16 |
-| Phases 2 to 8 | not started | each gated, I ask before starting |
+| Phase 1 (protocol codec) | done | frames, commands, model tables, memory map, encodings, buttons, keystrokes, macros, config file; golden vectors and property tests |
+| Phase 1 (differential oracle) | done | `make oracle` runs the vendor JavaScript sealed under bubblewrap (network, filesystem and environment all denied, seal verified by probe) and compares 358 operations across 16 categories against the Rust codec; all match byte for byte, and the one deliberate deviation (the vendor's config-import check-byte bug) is asserted explicitly. Not covered: the newer bundle's full setter matrix, the keyboard protocol, and the firmware module |
+| Phase 2 (device layer and simulator) | done | owner thread, request matching, push dispatch, hotplug, HID and simulator transports; compile-checked only, never run against hardware |
+| Phase 3 (app shell) | done | Tauri 3.0.0-alpha window, tray with battery, hide to tray, low battery notification, autostart, single instance; observed running on the operator's desktop |
+| Phase 4 (settings parity) | done | buttons, DPI, polling, debounce, LOD, motion sync, angle snap, ripple, performance, sleep, profiles, long range, DPI indicator |
+| Phase 5 (macros) | done | recording, editor and library in the embedded store |
+| Phase 6 (receiver tools and config files) | done | receiver light, pairing, factory reset, .bin export and import |
+| Phase 7 (firmware) | done as machinery | container parser, identity gate, guards, flash state machine, import path; no genuine package exists, so it has never been exercised and rollback remains impossible |
+| Phase 8 (packaging) | done as configuration | dist/deb, rpm, appimage, arch, windows, macos plus the udev rule and README; no package has been built or installed |
+| Gate | green | fmt, clippy with warnings as errors, doc build, 255 tests, cargo-deny advisories, bans, licenses and sources |
 
 Deferred, with reasons:
 

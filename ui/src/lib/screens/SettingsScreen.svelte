@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { device, isTauriShell } from '../device.svelte';
-	import type { AppSettings } from '../types';
+	import type { AppSettings, DeviceBackend, LinkType } from '../types';
 	import EmptyState from '../components/EmptyState.svelte';
 	import Toggle from '../components/Toggle.svelte';
 	import RangeField from '../components/RangeField.svelte';
 
-	let connectingId = $state<string | null>(null);
+	let connectingBackend = $state<DeviceBackend | null>(null);
 	let appDraft = $state<AppSettings | null>(null);
 	let appDirty = $state(false);
 	let appSaving = $state(false);
@@ -26,13 +26,20 @@
 		appDirty = false;
 	});
 
-	async function connectTo(id: string) {
-		connectingId = id;
+	// Real-device access always defaults to read-only (`device.connect`'s own default), matching
+	// the safety property: choosing "This device" is the explicit opt-in the contract requires,
+	// but it never implies write access.
+	async function connectTo(backend: DeviceBackend) {
+		connectingBackend = backend;
 		try {
-			await device.connect(id);
+			await device.connect(backend === 'realDevice');
 		} finally {
-			connectingId = null;
+			connectingBackend = null;
 		}
+	}
+
+	function formatLinkType(link: LinkType): string {
+		return link.kind === 'unknown' ? `unknown (0x${link.byte.toString(16)})` : link.kind;
 	}
 
 	async function saveAppSettings() {
@@ -102,10 +109,9 @@
 					<div class="field-label">Connected</div>
 					<div class="field-hint">
 						{#if device.identity}
-							cid {device.identity.cid}, mid {device.identity.mid}, link {typeof device.identity
-								.link === 'string'
-								? device.identity.link
-								: 'unknown'}
+							cid {device.identity.cid}, mid {device.identity.mid}, link {formatLinkType(
+								device.identity.link
+							)}
 						{:else}
 							Identity not read yet.
 						{/if}
@@ -115,7 +121,7 @@
 			</div>
 		{:else}
 			<div class="field-row">
-				<span class="field-hint">{device.devices.length} device(s) found.</span>
+				<span class="field-hint">{device.devices.length} connection option(s).</span>
 				<button class="btn" disabled={device.scanning} onclick={() => device.refreshDevices()}>
 					{device.scanning ? 'Scanning...' : 'Rescan'}
 				</button>
@@ -124,11 +130,15 @@
 				<p class="field-hint" style="margin-top:10px">No devices found.</p>
 			{:else}
 				<ul class="device-list">
-					{#each device.devices as d (d.id)}
+					{#each device.devices as d (d.backend)}
 						<li class="device-row">
-							<span>{d.description}</span>
-							<button class="btn btn-primary" disabled={connectingId !== null} onclick={() => connectTo(d.id)}>
-								{connectingId === d.id ? 'Connecting...' : 'Connect'}
+							<span>{d.label}: {d.description}</span>
+							<button
+								class="btn btn-primary"
+								disabled={connectingBackend !== null}
+								onclick={() => connectTo(d.backend)}
+							>
+								{connectingBackend === d.backend ? 'Connecting...' : 'Connect'}
 							</button>
 						</li>
 					{/each}
@@ -203,9 +213,9 @@
 				/>
 				<Toggle
 					label="Minimize to tray on close"
-					checked={appDraft.minimize_to_tray}
+					checked={appDraft.minimizeToTray}
 					onchange={(v) => {
-						if (appDraft) appDraft.minimize_to_tray = v;
+						if (appDraft) appDraft.minimizeToTray = v;
 						appDirty = true;
 					}}
 				/>
@@ -214,9 +224,9 @@
 					unit="%"
 					min={5}
 					max={50}
-					value={appDraft.low_battery_warning_percent}
+					value={appDraft.lowBatteryThresholdPercent}
 					onchange={(v) => {
-						if (appDraft) appDraft.low_battery_warning_percent = v;
+						if (appDraft) appDraft.lowBatteryThresholdPercent = v;
 						appDirty = true;
 					}}
 				/>

@@ -1,7 +1,14 @@
 <script lang="ts">
-	import { device } from '../device.svelte';
-	import { LIGHTING_MODES } from '../types';
-	import type { ReceiverLight, Settings } from '../types';
+	import { device, diffSettings } from '../device.svelte';
+	import { DPI_INDICATOR_MODES, LIGHTING_MODES, RECEIVER_LIGHT_MODES } from '../types';
+	import type {
+		DpiIndicatorMode,
+		DpiIndicatorModeName,
+		LightMode,
+		LightModeName,
+		ReceiverLight,
+		Settings
+	} from '../types';
 	import EmptyState from '../components/EmptyState.svelte';
 	import SelectField from '../components/SelectField.svelte';
 	import RangeField from '../components/RangeField.svelte';
@@ -11,13 +18,27 @@
 
 	// docs/research/mouse-protocol-v2.md 7.7: which controls a mode leaves
 	// meaningful. Off disables everything, Fixed color has no animation
-	// speed, the three cycling modes have no fixed color, mode 6 has neither.
-	function lightingControls(mode: number) {
-		if (mode === 0) return { color: false, speed: false };
-		if (mode === 3) return { color: true, speed: false };
-		if (mode === 1 || mode === 4 || mode === 5) return { color: false, speed: true };
-		if (mode === 6) return { color: false, speed: false };
-		return { color: true, speed: true }; // mode 2
+	// speed, the three cycling modes have no fixed color.
+	function lightingControls(mode: LightModeName | 'other') {
+		if (mode === 'off') return { color: false, speed: false };
+		if (mode === 'fixed') return { color: true, speed: false };
+		if (mode === 'rainbow' || mode === 'neon' || mode === 'rainbowBreath') {
+			return { color: false, speed: true };
+		}
+		if (mode === 'other') return { color: false, speed: false };
+		return { color: true, speed: true }; // singleColorBreath
+	}
+
+	// The select only offers the named variants (never `other`, which needs a `byte` field it
+	// never supplies); narrowing here keeps SelectField's generic inferred as the named-only
+	// union instead of widening, which would make `{ mode: v }` fail to satisfy `LightMode`.
+	function lightModeName(mode: LightMode['mode']): LightModeName {
+		return mode === 'other' ? 'off' : mode;
+	}
+
+	// Same narrowing as lightModeName above, for the DPI indicator's own mode enum.
+	function dpiIndicatorModeName(mode: DpiIndicatorMode['mode']): DpiIndicatorModeName {
+		return mode === 'other' ? 'off' : mode;
 	}
 
 	let draft = $state<Settings | null>(null);
@@ -29,17 +50,21 @@
 		dirty = false;
 	});
 
-	let controls = $derived(draft ? lightingControls(draft.lighting.mode) : { color: false, speed: false });
+	let controls = $derived(
+		draft ? lightingControls(draft.lighting.mode.mode) : { color: false, speed: false }
+	);
 
 	function touch() {
 		dirty = true;
 	}
 
+	/** Sends one `write_setting` call per field that actually changed since the last read (see
+	 * `diffSettings`); in practice just the lighting field, since this screen only edits that. */
 	async function apply() {
-		if (!draft) return;
+		if (!draft || !device.settings) return;
 		saving = true;
 		try {
-			await device.writeSetting({ lighting: draft.lighting, dpi_indicator: draft.dpi_indicator });
+			await device.writeSettings(diffSettings(device.settings, draft));
 			dirty = false;
 		} finally {
 			saving = false;
@@ -51,7 +76,7 @@
 	// Settings, so it is edited and sent independently.
 	let receiverLight = $state<ReceiverLight>({
 		mode: 0,
-		color: { r: 255, g: 255, b: 255 },
+		color: [255, 255, 255],
 		speed: 5,
 		brightness: 5,
 		time: 0
@@ -108,10 +133,10 @@
 				/>
 				<SelectField
 					label="Effect"
-					value={draft.lighting.mode}
-					options={LIGHTING_MODES.map((m) => ({ value: m.value, label: m.label }))}
+					value={lightModeName(draft.lighting.mode.mode)}
+					options={LIGHTING_MODES}
 					onchange={(v) => {
-						if (draft) draft.lighting = { ...draft.lighting, mode: v };
+						if (draft) draft.lighting = { ...draft.lighting, mode: { mode: v } };
 						touch();
 					}}
 				/>
@@ -148,43 +173,63 @@
 					}}
 				/>
 
-				<div class="divider"></div>
-				<div class="panel-title" style="margin:0">DPI indicator</div>
-				{#if draft.dpi_indicator}
-					<Toggle
-						label="Indicator on"
-						checked={draft.dpi_indicator.on}
-						onchange={(v) => {
-							if (draft?.dpi_indicator) draft.dpi_indicator.on = v;
-							touch();
-						}}
-					/>
-					<SelectField
-						label="Indicator mode"
-						value={draft.dpi_indicator.mode}
-						options={[
-							{ value: 0, label: 'Off' },
-							{ value: 1, label: 'Steady' },
-							{ value: 2, label: 'Breathing' }
-						]}
-						onchange={(v) => {
-							if (draft?.dpi_indicator) draft.dpi_indicator.mode = v;
-							touch();
-						}}
-					/>
-					<RangeField
-						label="Indicator brightness"
-						min={1}
-						max={10}
-						value={draft.dpi_indicator.brightness}
-						onchange={(v) => {
-							if (draft?.dpi_indicator) draft.dpi_indicator.brightness = v;
-							touch();
-						}}
-					/>
-				{:else}
-					<p class="field-hint">DPI indicator state is not reported by this read yet.</p>
+				<button class="btn btn-primary" disabled={!dirty || saving} onclick={apply}>
+					{saving ? 'Applying...' : dirty ? 'Apply changes' : 'Up to date'}
+				</button>
+				{#if device.lastError}
+					<p class="field-hint error-text">{device.lastError}</p>
 				{/if}
+			</div>
+		{/if}
+	</section>
+
+	<section class="panel">
+		<div class="panel-title">DPI indicator</div>
+		<div class="panel-subtitle">The per-stage indicator light: mode, brightness, speed and on/off.</div>
+		{#if !device.connected}
+			<EmptyState title="No device connected" message="Connect a mouse to edit its DPI indicator." />
+		{:else if device.settingsLoading || !draft}
+			<EmptyState title="Reading settings" message="Fetching the current DPI indicator state." />
+		{:else}
+			<div class="field-stack">
+				<Toggle
+					label="Indicator on"
+					checked={draft.dpiIndicator.on}
+					onchange={(v) => {
+						if (draft) draft.dpiIndicator = { ...draft.dpiIndicator, on: v };
+						touch();
+					}}
+				/>
+				<SelectField
+					label="Effect"
+					value={dpiIndicatorModeName(draft.dpiIndicator.mode.mode)}
+					options={DPI_INDICATOR_MODES}
+					onchange={(v) => {
+						if (draft) draft.dpiIndicator = { ...draft.dpiIndicator, mode: { mode: v } };
+						touch();
+					}}
+				/>
+				<RangeField
+					label="Brightness"
+					min={1}
+					max={10}
+					value={draft.dpiIndicator.brightness}
+					onchange={(v) => {
+						if (draft) draft.dpiIndicator = { ...draft.dpiIndicator, brightness: v };
+						touch();
+					}}
+				/>
+				<RangeField
+					label="Speed (raw)"
+					hint="Unit is not specified in the protocol reference"
+					min={0}
+					max={255}
+					value={draft.dpiIndicator.speed}
+					onchange={(v) => {
+						if (draft) draft.dpiIndicator = { ...draft.dpiIndicator, speed: v };
+						touch();
+					}}
+				/>
 
 				<button class="btn btn-primary" disabled={!dirty || saving} onclick={apply}>
 					{saving ? 'Applying...' : dirty ? 'Apply changes' : 'Up to date'}
@@ -205,7 +250,7 @@
 				<SelectField
 					label="Receiver light effect"
 					value={receiverLight.mode}
-					options={LIGHTING_MODES.map((m) => ({ value: m.value, label: m.label }))}
+					options={RECEIVER_LIGHT_MODES}
 					onchange={(v) => (receiverLight = { ...receiverLight, mode: v })}
 				/>
 				<ColorSwatchPicker

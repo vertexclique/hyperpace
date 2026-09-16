@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { device } from '../device.svelte';
-	import type { DpiStage, Lod, Settings } from '../types';
+	import { device, diffSettings } from '../device.svelte';
+	import type { DpiStage, Lod, Settings, SleepTime } from '../types';
 	import EmptyState from '../components/EmptyState.svelte';
 	import RangeField from '../components/RangeField.svelte';
 	import SelectField from '../components/SelectField.svelte';
@@ -12,22 +12,22 @@
 		label: `${hz} Hz`
 	}));
 
-	const LOD_OPTIONS: { value: Lod; label: string }[] = [
-		{ value: 'OneMm', label: '1 mm' },
-		{ value: 'TwoMm', label: '2 mm' },
-		{ value: 'PointSevenMm', label: '0.7 mm' }
+	const LOD_OPTIONS: { value: Exclude<Lod['value'], 'other'>; label: string }[] = [
+		{ value: 'oneMillimeter', label: '1 mm' },
+		{ value: 'twoMillimeters', label: '2 mm' },
+		{ value: 'pointSevenMillimeters', label: '0.7 mm' }
 	];
 
-	// mouse-protocol-v2.md 7.8: same tens-of-seconds codes shared by sleep
-	// timing and the highest-performance timeout.
-	const TIMEOUT_OPTIONS = [
-		{ value: 10, label: '10 s' },
-		{ value: 30, label: '30 s' },
-		{ value: 60, label: '1 min' },
-		{ value: 120, label: '2 min' },
-		{ value: 300, label: '5 min' },
-		{ value: 600, label: '10 min' },
-		{ value: 900, label: '15 min' }
+	// mouse-protocol-v2.md 7.8: the same named codes shared by sleep timing and the highest
+	// performance timeout (SleepTimeDto).
+	const TIMEOUT_OPTIONS: { value: Exclude<SleepTime['value'], 'other'>; label: string }[] = [
+		{ value: 'tenSeconds', label: '10 s' },
+		{ value: 'thirtySeconds', label: '30 s' },
+		{ value: 'oneMinute', label: '1 min' },
+		{ value: 'twoMinutes', label: '2 min' },
+		{ value: 'fiveMinutes', label: '5 min' },
+		{ value: 'tenMinutes', label: '10 min' },
+		{ value: 'fifteenMinutes', label: '15 min' }
 	];
 
 	const SENSOR_MODE_OPTIONS = [
@@ -36,6 +36,18 @@
 	];
 
 	const MAX_DPI_STAGES = 8;
+
+	// The select only offers the named variants (never `other`), so binding its `value` needs a
+	// narrowed read: this also keeps SelectField's generic inferred as the named-only union
+	// (excluding `other`, which needs a `byte` field the select never supplies) instead of
+	// widening to the full wire type, which would make `{ value: v }` fail to satisfy `Lod` /
+	// `SleepTime` below.
+	function lodName(value: Lod['value']): Exclude<Lod['value'], 'other'> {
+		return value === 'other' ? 'oneMillimeter' : value;
+	}
+	function sleepTimeName(value: SleepTime['value']): Exclude<SleepTime['value'], 'other'> {
+		return value === 'other' ? 'tenSeconds' : value;
+	}
 
 	let draft = $state<Settings | null>(null);
 	let saving = $state(false);
@@ -51,48 +63,37 @@
 	}
 
 	function addStage() {
-		if (!draft || draft.dpi_stages.length >= MAX_DPI_STAGES) return;
-		const last = draft.dpi_stages.at(-1);
-		draft.dpi_stages.push({
+		if (!draft || draft.dpiStages.length >= MAX_DPI_STAGES) return;
+		const last = draft.dpiStages.at(-1);
+		draft.dpiStages.push({
 			dpi: last ? last.dpi : 800,
-			color: last ? { ...last.color } : { r: 255, g: 255, b: 255 }
+			color: last ? [...last.color] : [255, 255, 255]
 		});
 		touch();
 	}
 
 	function removeStage(index: number) {
-		if (!draft || draft.dpi_stages.length <= 1) return;
-		draft.dpi_stages.splice(index, 1);
-		if (draft.current_stage >= draft.dpi_stages.length) {
-			draft.current_stage = draft.dpi_stages.length - 1;
+		if (!draft || draft.dpiStages.length <= 1) return;
+		draft.dpiStages.splice(index, 1);
+		if (draft.currentStage >= draft.dpiStages.length) {
+			draft.currentStage = draft.dpiStages.length - 1;
 		}
 		touch();
 	}
 
 	function updateStage(index: number, patch: Partial<DpiStage>) {
 		if (!draft) return;
-		draft.dpi_stages[index] = { ...draft.dpi_stages[index], ...patch };
+		draft.dpiStages[index] = { ...draft.dpiStages[index], ...patch };
 		touch();
 	}
 
+	/** Sends one `write_setting` call per field that actually changed since the last read, since
+	 * the command has no batch variant (see `diffSettings`). */
 	async function apply() {
-		if (!draft) return;
+		if (!draft || !device.settings) return;
 		saving = true;
 		try {
-			await device.writeSetting({
-				polling_hz: draft.polling_hz,
-				dpi_stages: draft.dpi_stages,
-				current_stage: draft.current_stage,
-				lod: draft.lod,
-				debounce_ms: draft.debounce_ms,
-				motion_sync: draft.motion_sync,
-				angle_snap: draft.angle_snap,
-				ripple: draft.ripple,
-				performance: draft.performance,
-				sleep: draft.sleep,
-				sensor_mode: draft.sensor_mode,
-				long_range: draft.long_range
-			});
+			await device.writeSettings(diffSettings(device.settings, draft));
 			dirty = false;
 		} finally {
 			saving = false;
@@ -117,16 +118,16 @@
 			<div class="panel-title">DPI stages</div>
 			<div class="panel-subtitle">Up to {MAX_DPI_STAGES} stages. The active stage is bound to the DPI switch action.</div>
 			<div class="stage-list">
-				{#each draft.dpi_stages as stage, i (i)}
-					<div class="stage-row" class:current={draft.current_stage === i}>
+				{#each draft.dpiStages as stage, i (i)}
+					<div class="stage-row" class:current={draft.currentStage === i}>
 						<button
 							type="button"
 							class="stage-radio"
-							aria-pressed={draft.current_stage === i}
+							aria-pressed={draft.currentStage === i}
 							title="Set as active stage"
 							onclick={() => {
 								if (!draft) return;
-								draft.current_stage = i;
+								draft.currentStage = i;
 								touch();
 							}}
 						>
@@ -148,7 +149,7 @@
 						<button
 							type="button"
 							class="btn btn-danger stage-remove"
-							disabled={draft.dpi_stages.length <= 1}
+							disabled={draft.dpiStages.length <= 1}
 							onclick={() => removeStage(i)}
 						>
 							Remove
@@ -156,7 +157,7 @@
 					</div>
 				{/each}
 			</div>
-			<button class="btn" disabled={draft.dpi_stages.length >= MAX_DPI_STAGES} onclick={addStage}>
+			<button class="btn" disabled={draft.dpiStages.length >= MAX_DPI_STAGES} onclick={addStage}>
 				Add stage
 			</button>
 		</section>
@@ -167,28 +168,28 @@
 			<div class="field-stack">
 				<SelectField
 					label="Polling rate"
-					value={draft.polling_hz}
+					value={draft.pollingHz}
 					options={POLLING_OPTIONS}
 					onchange={(v) => {
-						if (draft) draft.polling_hz = v;
+						if (draft) draft.pollingHz = v;
 						touch();
 					}}
 				/>
 				<SelectField
 					label="Lift-off distance"
-					value={draft.lod}
+					value={lodName(draft.lod.value)}
 					options={LOD_OPTIONS}
 					onchange={(v) => {
-						if (draft) draft.lod = v;
+						if (draft) draft.lod = { value: v };
 						touch();
 					}}
 				/>
 				<SelectField
 					label="Sensor mode"
-					value={draft.sensor_mode}
+					value={draft.sensorMode}
 					options={SENSOR_MODE_OPTIONS}
 					onchange={(v) => {
-						if (draft) draft.sensor_mode = v;
+						if (draft) draft.sensorMode = v;
 						touch();
 					}}
 				/>
@@ -197,9 +198,9 @@
 					unit=" ms"
 					min={0}
 					max={25}
-					value={draft.debounce_ms}
+					value={draft.debounceMs}
 					onchange={(v) => {
-						if (draft) draft.debounce_ms = v;
+						if (draft) draft.debounceMs = v;
 						touch();
 					}}
 				/>
@@ -212,17 +213,17 @@
 			<div class="field-stack">
 				<Toggle
 					label="Motion sync"
-					checked={draft.motion_sync}
+					checked={draft.motionSync}
 					onchange={(v) => {
-						if (draft) draft.motion_sync = v;
+						if (draft) draft.motionSync = v;
 						touch();
 					}}
 				/>
 				<Toggle
 					label="Angle snap"
-					checked={draft.angle_snap}
+					checked={draft.angleSnap}
 					onchange={(v) => {
-						if (draft) draft.angle_snap = v;
+						if (draft) draft.angleSnap = v;
 						touch();
 					}}
 				/>
@@ -239,14 +240,14 @@
 
 		<section class="panel">
 			<div class="panel-title">Power</div>
-			<div class="panel-subtitle">Sleep timer, highest-performance mode and the wireless link.</div>
+			<div class="panel-subtitle">Sleep timer and highest-performance mode.</div>
 			<div class="field-stack">
 				<SelectField
 					label="Sleep after"
-					value={draft.sleep.seconds}
+					value={sleepTimeName(draft.sleep.value)}
 					options={TIMEOUT_OPTIONS}
 					onchange={(v) => {
-						if (draft) draft.sleep = { seconds: v };
+						if (draft) draft.sleep = { value: v };
 						touch();
 					}}
 				/>
@@ -262,28 +263,32 @@
 				{#if draft.performance.on}
 					<SelectField
 						label="Highest performance timeout"
-						value={draft.performance.timeout_s}
+						value={sleepTimeName(draft.performance.timeout.value)}
 						options={TIMEOUT_OPTIONS}
 						onchange={(v) => {
-							if (draft) draft.performance = { ...draft.performance, timeout_s: v };
+							if (draft) draft.performance = { ...draft.performance, timeout: { value: v } };
 							touch();
 						}}
 					/>
-				{/if}
-				{#if draft.long_range !== undefined}
-					<Toggle
-						label="Long range mode"
-						hint="Extends the wireless link at the cost of polling headroom"
-						checked={draft.long_range}
-						onchange={(v) => {
-							if (draft) draft.long_range = v;
-							touch();
-						}}
-					/>
-				{:else}
-					<p class="field-hint">Long range state is not reported by this read yet.</p>
 				{/if}
 			</div>
+		</section>
+
+		<section class="panel">
+			<div class="panel-title">Long range</div>
+			<div class="panel-subtitle">Extends the wireless link's effective range on receivers that support it.</div>
+			{#if draft.longRange === 'unsupported'}
+				<p class="field-hint">Not supported on this device.</p>
+			{:else}
+				<Toggle
+					label="Long range mode"
+					checked={draft.longRange === 'on'}
+					onchange={(v) => {
+						if (draft) draft.longRange = v ? 'on' : 'off';
+						touch();
+					}}
+				/>
+			{/if}
 		</section>
 	</div>
 
