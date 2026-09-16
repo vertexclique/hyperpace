@@ -7,7 +7,7 @@ SHELL := /usr/bin/env bash
 INFRA_DIR ?= infra
 DATE := $(shell date +%Y-%m-%d)
 
-.PHONY: help setup build test gate fmt lint doctor \
+.PHONY: help setup build test gate fmt lint doctor oracle \
         tf-fmt tf-validate tf-plan tf-apply infra-log clean
 
 help: ## list targets
@@ -61,3 +61,6 @@ infra-log: ## scaffold a new dated infra change entry from the template
 
 clean: ## remove build output
 	@rm -rf target ui/build ui/node_modules/.cache
+
+oracle: ## regenerate the hyperpace-protocol differential oracle fixture (sealed under bwrap)
+	@scripts/oracle.sh
