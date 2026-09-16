@@ -1,0 +1,26 @@
+[package]
+name = "hyperpace-device"
+description = "Device access for Hyperpace: owner thread per device, hotplug, and the simulator"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+hyperpace-protocol = { path = "../hyperpace-protocol", version = "0.1.0" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+hidapi = { version = "2.6.7", default-features = false, features = ["linux-native-basic-udev"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+hidapi = { version = "2.6.7", default-features = false, features = ["windows-native"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+hidapi = { version = "2.6.7", default-features = false, features = ["macos-shared-device"] }
+
+[dev-dependencies]
+proptest = "1.11"
+
+[lints]
+workspace = true

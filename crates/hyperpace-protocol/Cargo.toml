@@ -1,0 +1,14 @@
+[package]
+name = "hyperpace-protocol"
+description = "Wire codec for the Hyperpace device channel: frames, checksums, settings map and value encodings"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dev-dependencies]
+proptest = "1.11"
+
+[lints]
+workspace = true

@@ -1,0 +1,9 @@
+# Build output
+/target
+/ui/build
+/ui/.svelte-kit
+/ui/node_modules
+
+# Editor and OS noise
+*.swp
+.DS_Store

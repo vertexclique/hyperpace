@@ -1,0 +1,74 @@
+# cargo-deny config. No new third-party dependency without review; license
+# allowlist, everything else fails. Schema: https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+all-features = false
+# Restrict the audited graph to the platforms Hyperpace actually ships (see
+# docs/plans/hyperpace.md packaging section: deb, rpm, appimage, arch, NSIS,
+# macos). Without this, cargo-deny also scans wasm32 and mobile edges that
+# defradb.rs's own crates carry for its own browser/mobile targets and that
+# never compile into this desktop app, producing false-positive findings.
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-pc-windows-msvc",
+  "aarch64-pc-windows-msvc",
+  "x86_64-apple-darwin",
+  "aarch64-apple-darwin",
+]
+
+[licenses]
+version = 2
+confidence-threshold = 0.93
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "MIT",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "Unicode-3.0",
+  "Unicode-DFS-2016",
+  "CC0-1.0",
+  # Weak, file-level copyleft. Linking is unrestricted; only modifications to
+  # those files themselves must be published, and Hyperpace modifies none of
+  # them. Present through the CSS and utility crates the webview stack pulls in
+  # (cssparser, cssparser-macros, selectors, dtoa-short, ascii_utils,
+  # fast_chemail, option-ext).
+  "MPL-2.0",
+  # Public domain dedication. Present through ksni, the Linux tray backend that
+  # Tauri 3 uses in place of libayatana-appindicator.
+  "Unlicense",
+  # Boost Software License, permissive and attribution-free for binaries.
+  # Present through xxhash-rust.
+  "BSL-1.0",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[advisories]
+version = 2
+yanked = "deny"
+# Both entries below are "unmaintained" notices, not vulnerabilities: neither
+# advisory reports an exploitable defect, cargo-deny reports no safe upgrade,
+# and both crates are baked into third-party manifests with no feature that
+# turns them off. They are listed here so the gate stays honest about what is
+# accepted, and they are re-checked whenever the dependency that carries them
+# is upgraded.
+ignore = [
+  # fxhash, a hashing crate reached through bm25 inside the embedded store.
+  "RUSTSEC-2025-0057",
+  # proc-macro-error, a build-time macro helper reached through glib-macros in
+  # the GTK stack the Linux webview requires.
+  "RUSTSEC-2024-0370",
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+# The embedded storage engine (see crates/hyperpace-store/Cargo.toml), pinned
+# to an exact commit; approved in docs/plans/hyperpace.md section 2.
+allow-git = ["https://github.com/sourcenetwork/defradb.rs"]

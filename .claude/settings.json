@@ -1,0 +1,69 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "/home/vcq/.local/bin/vertexia code sync . &",
+            "type": "command"
+          }
+        ],
+        "matcher": "Edit|Write|NotebookEdit"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "/home/vcq/.local/bin/vertexia hook block-attribution",
+            "type": "command"
+          },
+          {
+            "command": "/home/vcq/.local/bin/vertexia hook commit-push-hold",
+            "type": "command"
+          },
+          {
+            "command": "/home/vcq/.local/bin/vertexia hook steer-node",
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "/home/vcq/.local/bin/vertexia code sync . &",
+            "type": "command"
+          }
+        ],
+        "matcher": "startup"
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(vertexia gate:*)",
+      "Bash(vertexia hold:*)",
+      "Bash(vertexia research:*)",
+      "Bash(vertexia plan:*)",
+      "Bash(vertexia code:*)",
+      "Bash(vertexia signals:*)",
+      "Bash(vertexia profile:*)",
+      "Bash(vertexia validate:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo doc:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm test:*)",
+      "Bash(pytest:*)",
+      "Bash(ruff:*)",
+      "Bash(mypy:*)"
+    ]
+  }
+}

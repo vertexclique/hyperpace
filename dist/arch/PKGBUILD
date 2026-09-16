@@ -1,0 +1,40 @@
+# PKGBUILD for a local build: it packages this repository checkout in place
+# rather than fetching a source tarball, so it only works run from inside a
+# clone (makepkg from this directory, with the rest of the workspace intact
+# two levels up). There is no upstream release yet to point a `source=` array
+# at. Not build-verified in this sandbox: makepkg needs network access to
+# fetch crates and npm packages, which this environment does not grant.
+pkgname=hyperpace
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Configure your mouse over USB: buttons, DPI, lighting, macros and firmware"
+arch=('x86_64' 'aarch64')
+url="https://github.com/vertexclique/hyperpace"
+license=('MIT' 'Apache-2.0')
+depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator')
+makedepends=('cargo' 'npm')
+options=('!lto')
+install=hyperpace.install
+
+pkgver() {
+    grep -m1 '^version' "$startdir/../../Cargo.toml" | cut -d'"' -f2
+}
+
+build() {
+    cd "$startdir/../.."
+    npm --prefix ui ci
+    npm --prefix ui run build
+    cargo build --release --locked -p hyperpace-app --bin hyperpace
+}
+
+package() {
+    cd "$startdir/../.."
+    install -Dm755 "target/release/hyperpace" "$pkgdir/usr/bin/hyperpace"
+    install -Dm644 "dist/arch/hyperpace.desktop" "$pkgdir/usr/share/applications/hyperpace.desktop"
+    install -Dm644 "crates/hyperpace-app/icons/icon.png" \
+        "$pkgdir/usr/share/icons/hicolor/256x256/apps/hyperpace.png"
+    install -Dm644 "dist/udev/70-hyperpace.rules" \
+        "$pkgdir/usr/lib/udev/rules.d/70-hyperpace.rules"
+    install -Dm644 LICENSE-MIT "$pkgdir/usr/share/licenses/$pkgname/LICENSE-MIT" 2>/dev/null || true
+    install -Dm644 LICENSE-APACHE "$pkgdir/usr/share/licenses/$pkgname/LICENSE-APACHE" 2>/dev/null || true
+}

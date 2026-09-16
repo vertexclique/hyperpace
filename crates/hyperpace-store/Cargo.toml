@@ -1,0 +1,39 @@
+[package]
+name = "hyperpace-store"
+description = "Local store for Hyperpace: macros, profiles, settings and the firmware index"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# The embedded defradb.rs node this crate stores everything in; see src/store.rs for why this
+# dependency and this exact feature selection (default-features off, "native" only, so neither
+# libp2p nor the wasmtime WASM runtime is pulled in) was verified to build and work
+# storage-only before any of this crate's code was written.
+#
+# Pinned to an exact commit: defradb.rs is pre-1.0 and under active development (580+ open
+# branches at the time this was pinned), so floating on a branch would mean this crate's build
+# could change out from under it with no signal here. Bump deliberately by updating `rev` on
+# both crates below together and re-running this crate's tests.
+embedded = { git = "https://github.com/sourcenetwork/defradb.rs", rev = "9eba6704d8866185a8a6f486646a34e3a6da22f3", package = "embedded", version = "0.5.0", default-features = false, features = [
+    "native",
+] }
+# Names `query::QueryRequest`/`QueryResponse`, which `embedded::EmbeddedNode::query_runner` is
+# typed with; see src/worker.rs. Same repository and commit as `embedded` above, so Cargo
+# resolves both against one checkout.
+query = { git = "https://github.com/sourcenetwork/defradb.rs", rev = "9eba6704d8866185a8a6f486646a34e3a6da22f3", package = "query", version = "0.5.0" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Only the multi-thread builder and block_on: this crate's own use of Tokio (see
+# src/worker.rs). Every other runtime feature the embedded node itself needs (timers, fs, sync)
+# is already pulled in by `embedded`'s own dependency on tokio, and Cargo unifies the feature
+# set for one crate version across the whole build.
+tokio = { version = "1", features = ["rt-multi-thread"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

@@ -1,0 +1,43 @@
+[package]
+name = "hyperpace-app"
+description = "Hyperpace desktop application: commands, tray, notifications and window lifecycle"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "hyperpace_app"
+path = "src/lib.rs"
+
+[[bin]]
+name = "hyperpace"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "3.0.0-alpha.0", features = ["config-json"] }
+
+[dependencies]
+hyperpace-protocol = { path = "../hyperpace-protocol", version = "0.1.0" }
+hyperpace-device = { path = "../hyperpace-device", version = "0.1.0" }
+hyperpace-firmware = { path = "../hyperpace-firmware", version = "0.1.0" }
+hyperpace-store = { path = "../hyperpace-store", version = "0.1.0" }
+
+tauri = { version = "3.0.0-alpha.1", features = ["tray-icon"] }
+# tauri 3.0.0-alpha no longer bundles a concrete window backend behind a default feature; the app
+# crate now selects one explicitly via `Builder::runtime`, so this is a direct dependency rather
+# than a feature flag.
+tauri-runtime-wry = "3.0.0-alpha.0"
+tauri-plugin-autostart = "3.0.0-alpha.0"
+tauri-plugin-single-instance = "3.0.0-alpha.0"
+tauri-plugin-notification = "3.0.0-alpha.0"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Only used to name the local firmware archive's files by content hash (`hyperpace-store`'s
+# `FirmwareRecord::sha256`); not used for anything security-sensitive.
+sha2 = "0.10"
+
+[lints]
+workspace = true

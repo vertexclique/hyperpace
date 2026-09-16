@@ -1,0 +1,29 @@
+{
+  "identifier": "default",
+  "description": "Every command the main window may invoke.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "allow-list-devices",
+    "allow-connect",
+    "allow-disconnect",
+    "allow-device-state",
+    "allow-read-settings",
+    "allow-write-setting",
+    "allow-set-button",
+    "allow-save-macro",
+    "allow-list-macros",
+    "allow-delete-macro",
+    "allow-set-profile",
+    "allow-factory-reset",
+    "allow-pair-receiver",
+    "allow-receiver-light",
+    "allow-export-config",
+    "allow-import-config",
+    "allow-firmware-list",
+    "allow-firmware-import",
+    "allow-firmware-install",
+    "allow-firmware-check-for-updates",
+    "allow-app-settings"
+  ]
+}

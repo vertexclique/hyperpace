@@ -1,0 +1,22 @@
+# pacman install hook: applies 70-hyperpace.rules to an already-plugged-in
+# device without a replug. Reload is safe to run on every hook (idempotent);
+# see ../udev/reload-udev-rules.sh for the same step under deb and rpm.
+
+post_install() {
+    _reload_udev
+}
+
+post_upgrade() {
+    _reload_udev
+}
+
+post_remove() {
+    _reload_udev
+}
+
+_reload_udev() {
+    if command -v udevadm >/dev/null 2>&1; then
+        udevadm control --reload-rules
+        udevadm trigger --subsystem-match=hidraw
+    fi
+}

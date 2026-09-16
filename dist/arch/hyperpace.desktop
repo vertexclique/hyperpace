@@ -1,0 +1,9 @@
+[Desktop Entry]
+Categories=Utility;
+Comment=Configure your mouse: buttons, DPI, lighting, macros and firmware
+Exec=hyperpace
+StartupWMClass=hyperpace
+Icon=hyperpace
+Name=Hyperpace
+Terminal=false
+Type=Application

@@ -1,0 +1,14 @@
+# Hyperpace: grant the logged-in user read-write access to the device's HID
+# nodes without root, so the app never needs sudo or a setuid helper to talk
+# to the config channel. Matches by USB vendor id 3554 and both product ids
+# the device reports: fb16 (2.4 GHz receiver) and fb14 (wired). Numbers only,
+# no vendor or model string, matching every other product-facing string in
+# this repository.
+#
+# Filename must sort before 73-seat-late.rules (shipped by systemd), which is
+# what assigns the desktop "seat" that some session managers key device
+# permissions on; a rule numbered 73 or later can lose that race and leave
+# the node root-only until the next replug. 70 keeps this rule ahead of it,
+# matching the systemd convention already used by 70-uaccess.rules upstream.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="3554", ATTRS{idProduct}=="fb16", TAG+="uaccess"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="3554", ATTRS{idProduct}=="fb14", TAG+="uaccess"

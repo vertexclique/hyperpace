@@ -1,0 +1,10 @@
+# Workspace clippy config. Pin clippy's MSRV to the workspace rust-version so
+# version-gated lints do not propose APIs newer than the supported floor. Keep
+# in lockstep with [workspace.package].rust-version. Raise as the floor moves;
+# build with the latest stable (see the doctrine: latest toolchain).
+msrv = "1.91.0"
+
+# Extend clippy's proper-noun allowlist so clippy::doc_markdown does not flag
+# brand and product names that are prose, not code. Genuine identifiers stay
+# backticked; these are names only.
+doc-valid-idents = ["..", "GitHub", "GitLab", "PostgreSQL", "SQLite", "WebAssembly", "OpenAI", "BLAKE3"]

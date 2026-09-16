@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "vertexia-code": {
+      "args": [
+        "code",
+        "mcp"
+      ],
+      "command": "vertexia",
+      "type": "stdio"
+    }
+  }
+}

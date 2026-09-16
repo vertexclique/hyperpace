@@ -1,0 +1,14 @@
+[package]
+name = "hyperpace-firmware"
+description = "Firmware package parsing, identity gating and the update state machine for Hyperpace"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+hyperpace-protocol = { path = "../hyperpace-protocol", version = "0.1.0" }
+
+[lints]
+workspace = true

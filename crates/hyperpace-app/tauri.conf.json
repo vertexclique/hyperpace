@@ -1,0 +1,18 @@
+{
+  "productName": "Hyperpace",
+  "version": "0.1.0",
+  "identifier": "io.vertexclique.hyperpace",
+  "app": {
+    "windows": [],
+    "security": {
+      "capabilities": []
+    }
+  },
+  "build": {
+    "frontendDist": "../../ui/build",
+    "beforeBuildCommand": "npm --prefix ../../ui run build"
+  },
+  "bundle": {
+    "icon": ["icons/icon.png"]
+  }
+}
