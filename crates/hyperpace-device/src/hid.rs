@@ -1,10 +1,8 @@
 //! The real transport: hidapi's vendor configuration collection, on the operator's own hardware.
 //!
 //! Never exercised by this crate's own test suite (every test in this crate uses
-//! [`crate::SimTransport`]) or by anything this crate runs automatically: opening or enumerating
-//! a real HID device is out of scope for anything but the application the operator launches by
-//! hand. What follows is a complete implementation, compiled and type-checked on every platform,
-//! simply never invoked here.
+//! [`crate::SimTransport`]). The application opens it, and so do the `probe`, `read_state` and
+//! `dump_settings` examples, which have been run against the operator's own device.
 
 use core::time::Duration;
 
@@ -49,7 +47,12 @@ pub(crate) fn is_vendor_collection(info: &hidapi::DeviceInfo) -> bool {
 }
 
 impl HidTransport {
-    /// Open the first attached collection matching `is_vendor_collection`.
+    /// Open the best attached configuration collection: the cable when the mouse is plugged in,
+    /// otherwise the receiver.
+    ///
+    /// The cable wins because a mouse on its cable stops talking to the receiver: the receiver's
+    /// collection stays attached but its mouse reports offline, so a connection through it would
+    /// show the mouse as asleep and could never read its battery or charging state.
     ///
     /// # Errors
     ///
@@ -58,19 +61,55 @@ impl HidTransport {
     /// could not be opened.
     pub fn open_first() -> Result<Self, DeviceError> {
         let api = HidApi::new().map_err(|error| DeviceError::Io(error.to_string()))?;
-        let candidate = api
+        let candidates: Vec<_> = api
             .device_list()
-            .find(|info| is_vendor_collection(info))
-            .ok_or(DeviceError::Disconnected)?;
-        let link = if candidate.product_id() == PRODUCT_ID_WIRED {
-            "wired"
-        } else {
-            "wireless via receiver"
-        };
-        let device = candidate
-            .open_device(&api)
-            .map_err(|error| DeviceError::Io(error.to_string()))?;
-        Ok(Self { device, link })
+            .filter(|info| is_vendor_collection(info))
+            .collect();
+        if candidates.is_empty() {
+            return Err(DeviceError::Disconnected);
+        }
+        // Cable first, receiver second. A candidate that cannot be opened (on Linux, usually a node
+        // the access rule has not been applied to yet) falls through to the next one rather than
+        // leaving the app with no connection at all; the error from the preferred one is kept,
+        // because that is the one the operator can act on.
+        let mut ordered: Vec<_> = candidates.iter().collect();
+        ordered.sort_by_key(|info| info.product_id() != PRODUCT_ID_WIRED);
+        let mut first_error = None;
+        for candidate in ordered {
+            match candidate.open_device(&api) {
+                Ok(device) => {
+                    let link = if candidate.product_id() == PRODUCT_ID_WIRED {
+                        "wired"
+                    } else {
+                        "wireless via receiver"
+                    };
+                    return Ok(Self { device, link });
+                }
+                Err(error) => {
+                    first_error.get_or_insert_with(|| DeviceError::Io(error.to_string()));
+                }
+            }
+        }
+        Err(first_error.unwrap_or(DeviceError::Disconnected))
+    }
+
+    /// Whether this connection goes over the cable rather than the receiver.
+    #[must_use]
+    pub fn is_wired(&self) -> bool {
+        self.link == "wired"
+    }
+
+    /// Whether the mouse's own cable collection is attached right now. Enumeration only; nothing
+    /// is opened.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DeviceError::Io`] when the HID subsystem could not be reached.
+    pub fn wired_attached() -> Result<bool, DeviceError> {
+        let api = HidApi::new().map_err(|error| DeviceError::Io(error.to_string()))?;
+        Ok(api
+            .device_list()
+            .any(|info| is_vendor_collection(info) && info.product_id() == PRODUCT_ID_WIRED))
     }
 }
 

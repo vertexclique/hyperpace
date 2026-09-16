@@ -58,6 +58,21 @@ pub fn set_scalar(address: u16, value: u8) -> Frame {
     frame
 }
 
+/// A `DongleEnterPair` (command 5) request asking the receiver to pair with a mouse of model
+/// `cid`.
+///
+/// Protocol reference section 10.1: `05 00 00 00 02 00 00 <cid>`. The declared length is 2 while
+/// the cid sits at payload byte 2, outside it; the receiver reads it there regardless. A bare
+/// command-5 frame with no cid is refused with status 1, which is easy to misread as "pairing is
+/// unsupported" when the request itself was the problem.
+#[must_use]
+pub fn enter_pair(cid: u8) -> Frame {
+    let mut frame = Frame::command(5);
+    frame.length = 2;
+    frame.payload[2] = cid;
+    frame
+}
+
 /// A `SetCurrentConfig` (command 15) request selecting profile `index`.
 #[must_use]
 pub fn set_profile(index: u8) -> Frame {
@@ -99,6 +114,14 @@ mod tests {
     #![allow(clippy::unwrap_used)]
 
     use super::*;
+
+    #[test]
+    fn enter_pair_matches_the_documented_frame() {
+        // Section 10.1: `05 00 00 00 02 00 00 <cid> 00*7 <ck>`.
+        let bytes = enter_pair(102).encode();
+        assert_eq!(&bytes[..8], &[5, 0, 0, 0, 2, 0, 0, 102]);
+        assert!(bytes[8..15].iter().all(|&byte| byte == 0));
+    }
 
     #[test]
     fn handshake_matches_the_eight_byte_payload_shape() {

@@ -340,6 +340,27 @@ pub fn profile(frame: &Frame) -> Result<u8, ProtocolError> {
     Ok(frame.payload[0])
 }
 
+/// Decode a `GetDongleLight` (25) reply: the receiver's own indicator light as it is set now.
+///
+/// Protocol reference section 10.5: mode, red, green, blue, speed, brightness and time at payload
+/// bytes 0..7, the same fields `SetDongleLight` writes.
+///
+/// # Errors
+///
+/// Returns [`ProtocolError::WrongCommand`] if `frame` did not answer command 25, and
+/// [`ProtocolError::Unsupported`] if the receiver marked its light unsupported (status 1).
+pub fn receiver_light(frame: &Frame) -> Result<crate::settings::ReceiverLight, ProtocolError> {
+    expect_reply(frame, 25)?;
+    let payload = frame.payload;
+    Ok(crate::settings::ReceiverLight {
+        mode: payload[0],
+        color: (payload[1], payload[2], payload[3]),
+        speed: payload[4],
+        brightness: payload[5],
+        time: payload[6],
+    })
+}
+
 /// Decode a `GetLongRangeMode` (23) reply: whether long range mode is on.
 ///
 /// Not part of the flash shadow (section 7.9): long range is a dedicated command pair, so this

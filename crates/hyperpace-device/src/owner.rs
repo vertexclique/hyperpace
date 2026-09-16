@@ -154,7 +154,28 @@ fn dispatch(
         state.parked.push((arrived, command));
         return Ok(());
     }
-    handle_command(command, transport, state)
+    handle_command(command, arrived, transport, state)
+}
+
+/// Whether a timeout on a command that arrived at `arrived` should be retried after the device is
+/// re-established, rather than returned to the caller.
+///
+/// A mouse that stops answering while the owner believes it is ready has usually just dropped its
+/// link for a moment: a polling rate change makes it re-link, and it can fall asleep between two
+/// battery polls. Failing the request there would show the operator an error for a change that
+/// is about to succeed. Instead the owner goes back to the handshake at once, without waiting for
+/// the next battery poll to notice, and the command waits out the reconnect within the same
+/// [`PARK_LIMIT`] every parked command gets.
+fn retry_after_relink(state: &mut OwnerState, arrived: Instant) -> bool {
+    if arrived.elapsed() >= PARK_LIMIT {
+        return false;
+    }
+    if matches!(state.phase, ConnectPhase::Ready) {
+        state.phase = ConnectPhase::Handshake;
+        state.last_battery_poll = None;
+        broadcast(&mut state.subscribers, DeviceEvent::Offline);
+    }
+    true
 }
 
 /// Refuse every parked command that has waited [`PARK_LIMIT`] for a mouse that never woke.
@@ -442,6 +463,7 @@ fn service_request(
     frame: Frame,
     timeout: Duration,
     reply: &mpsc::Sender<Result<Frame, DeviceError>>,
+    arrived: Instant,
 ) -> Result<(), ServiceExit> {
     if state.access == Access::ReadOnly && is_write_command(frame.command) {
         let _ = reply.send(Err(DeviceError::ReadOnly));
@@ -449,6 +471,22 @@ fn service_request(
     }
     let command_byte = frame.command;
     let result = send_and_await(transport, state, command_byte, &frame, timeout);
+    let receiver_answers =
+        Command::from_byte(command_byte).is_some_and(Command::answered_by_receiver);
+    if matches!(result, Err(DeviceError::Timeout))
+        && !receiver_answers
+        && retry_after_relink(state, arrived)
+    {
+        state.parked.push((
+            arrived,
+            OwnerCommand::Request {
+                frame,
+                timeout,
+                reply: reply.clone(),
+            },
+        ));
+        return Ok(());
+    }
     if let Ok(reply_frame) = &result
         && command_byte == Command::FactoryReset as u8
         && reply_frame.status() != hyperpace_protocol::Status::Unsupported
@@ -487,6 +525,7 @@ fn service_read_block(
 /// on its reply channel has already been told.
 fn handle_command(
     command: OwnerCommand,
+    arrived: Instant,
     transport: &mut dyn Transport,
     state: &mut OwnerState,
 ) -> Result<(), ServiceExit> {
@@ -500,13 +539,21 @@ fn handle_command(
             frame,
             timeout,
             reply,
-        } => service_request(transport, state, frame, timeout, &reply)?,
+        } => service_request(transport, state, frame, timeout, &reply, arrived)?,
         OwnerCommand::ReadSettings { reply } => {
             if state.stale {
                 // The device pushed a change of its own since the cache was filled: re-read the
                 // base block so this answer is what the mouse holds now, not what it held then.
                 match read_block(transport, state, 0, usize::from(WALK_LEN)) {
                     Ok(_) => state.stale = false,
+                    // A polling change pushes this very read, and re-links the mouse while doing
+                    // it; wait the re-link out instead of failing the read that follows it.
+                    Err(DeviceError::Timeout) if retry_after_relink(state, arrived) => {
+                        state
+                            .parked
+                            .push((arrived, OwnerCommand::ReadSettings { reply }));
+                        return Ok(());
+                    }
                     Err(DeviceError::Disconnected) => {
                         let _ = reply.send(Err(DeviceError::Disconnected));
                         return Err(ServiceExit::Disconnected);
@@ -541,6 +588,19 @@ fn handle_command(
                 &frame,
                 WRITE_TIMEOUT,
             );
+            // Re-sending a scalar pair is idempotent, so a write whose acknowledgement was lost to
+            // a re-link is safe to retry.
+            if matches!(result, Err(DeviceError::Timeout)) && retry_after_relink(state, arrived) {
+                state.parked.push((
+                    arrived,
+                    OwnerCommand::WriteScalar {
+                        address,
+                        value,
+                        reply,
+                    },
+                ));
+                return Ok(());
+            }
             let disconnected = matches!(result, Err(DeviceError::Disconnected));
             match result {
                 Ok(_) => {
@@ -818,6 +878,33 @@ mod tests {
             handle.read_settings().unwrap().scalar(offset::POLLING),
             0x01
         );
+    }
+
+    #[test]
+    fn a_request_that_hits_a_relink_is_retried_instead_of_failing() {
+        // What a polling rate change does to a real mouse: it stops answering for a moment while
+        // it re-links. Here the mouse drops between two battery polls, so the owner still thinks
+        // it is ready when the request goes out.
+        let (transport, controller) = SimTransport::new(62, 1, 4);
+        controller.set_flash(offset::POLLING, &POLLING_8K);
+        let handle = spawn(Box::new(transport), Access::ReadWrite).unwrap();
+        let events = handle.events();
+        wait_for(&events, TEST_TIMEOUT, |event| {
+            matches!(event, DeviceEvent::Connected(_))
+        });
+
+        controller.set_online(false);
+        let requester = handle.clone();
+        let pending = thread::spawn(move || {
+            requester.request(Command::GetProfile.request(), Duration::from_millis(300))
+        });
+        wait_for(&events, TEST_TIMEOUT, |event| {
+            matches!(event, DeviceEvent::Offline)
+        });
+        controller.set_online(true);
+
+        let reply = pending.join().unwrap().unwrap();
+        assert_eq!(reply.command, Command::GetProfile as u8);
     }
 
     #[test]
